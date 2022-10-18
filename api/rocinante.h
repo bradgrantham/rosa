@@ -2,6 +2,7 @@
 #define _ROCINANTE_H_
 
 #include <math.h>
+#include <inttypes.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
