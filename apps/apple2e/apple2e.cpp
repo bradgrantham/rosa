@@ -2280,19 +2280,13 @@ struct averaged_sequence
     }
 };
 
-#ifdef ROSA
-extern "C" {
-void HAL_Delay(uint32_t millis);
-};
-#endif
-
 static void sleep_for(int32_t millis)
 {
     if(millis < 0) {
         return;
     }
-#ifdef ROSA
-    HAL_Delay(millis);
+#ifdef ROSA // XXX this should be a platform function
+    RoDelayMillis(millis);
 #else
     this_thread::sleep_for(chrono::milliseconds(millis));
 #endif
@@ -2301,7 +2295,6 @@ static void sleep_for(int32_t millis)
 extern "C" {
 int apple2_main(int argc, const char **argv);
 int main_iterate(void);
-uint32_t HAL_GetTick();
 };
 
 
@@ -2477,7 +2470,7 @@ int apple2_main(int argc, const char **argv)
                 }
             }
             clk_t prev_clock = clk;
-            uint32_t prevTick = HAL_GetTick();
+            uint32_t prevTick = RoGetMillis();
             // RoDebugOverlaySetLine(0, "step");
             while(clk - prev_clock < clocks_per_slice) {
                 if(debug & DEBUG_DECODE) {
@@ -2501,7 +2494,7 @@ int apple2_main(int argc, const char **argv)
                         print_cpu_state(cpu);
                     }
                 }
-                uint32_t nowTick = HAL_GetTick();
+                uint32_t nowTick = RoGetMillis();
 #warning Setting this to + 16 made USB keyboard stop working.  
                 if(nowTick >= prevTick) {
                     main_iterate();

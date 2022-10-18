@@ -173,7 +173,6 @@ struct Resampler
 extern "C" {
 int mp3player_main(int argc, char **argv);
 void main_iterate(void);
-uint32_t HAL_GetTick();
 };
 
 #define main mp3player_main
@@ -210,7 +209,7 @@ int main(int argc, char **argv)
 #else /* defined(ROSA) */
 
     uint32_t prevTick;
-    prevTick = HAL_GetTick();
+    prevTick = RoGetMillis();
 
     RoAudioGetSamplingInfo(&audioSampleRate, &audioChunkLengthBytes);
     rate = trunc(audioSampleRate + 0.5f);
@@ -288,7 +287,7 @@ int main(int argc, char **argv)
 
 #if defined(ROSA)
 
-        uint32_t nowTick = HAL_GetTick();
+        uint32_t nowTick = RoGetMillis();
 #warning Setting this to + 16 made USB keyboard stop working.  
         if(nowTick >= prevTick + 16) {
             main_iterate();

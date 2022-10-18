@@ -1759,10 +1759,8 @@ void set_colecovision_context(ColecovisionContext *colecovision_context, RAMboar
 #if defined(ROSA)
 
 extern "C" {
-void HAL_Delay(uint32_t millis);
 int coleco_main(int argc, char **argv);
 void main_iterate(void);
-uint32_t HAL_GetTick();
 };
 
 #define main coleco_main
@@ -1778,7 +1776,7 @@ namespace ColecovisionEmulator
         return;
     }
 #ifdef ROSA
-    HAL_Delay(millis);
+    RoDelayMillis(millis);
 #else
     std::this_thread::sleep_for(std::chrono::milliseconds(millis));
 #endif
@@ -2087,7 +2085,7 @@ int main(int argc, char **argv)
     std::chrono::time_point<std::chrono::system_clock> emulation_start_time = std::chrono::system_clock::now();
     uint32_t prevTick;
 #if defined(ROSA)
-    prevTick = HAL_GetTick();
+    prevTick = RoGetMillis();
 #endif
 
     PlatformInterface::MainLoopBodyFunc main_loop_body = [colecovision_context, &clk, debugger, colecohw, &save_vdp, stereo_audio_flush, platform_scanout, &emulation_start_time, &prevTick, freerun]() {
@@ -2185,7 +2183,7 @@ int main(int argc, char **argv)
             }
 
 #if defined(ROSA)
-            uint32_t nowTick = HAL_GetTick();
+            uint32_t nowTick = RoGetMillis();
 #warning Setting this to + 16 made USB keyboard stop working.  
             if(nowTick >= prevTick + 16) {
                 main_iterate();
