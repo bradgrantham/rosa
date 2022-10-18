@@ -296,19 +296,19 @@ int main(int argc, char **argv)
         }
 #endif
 
-        Event ev;
+        RoEvent ev;
         int haveEvent = RoEventPoll(&ev);
 
         if(haveEvent) {
             switch(ev.eventType) {
-                case ::Event::KEYBOARD_RAW: {
+                case RoEvent::KEYBOARD_RAW: {
                     const struct KeyboardRawEvent raw = ev.u.keyboardRaw;
                     if(raw.isPress) {
                         try_again = false;
                     }
                     break;
                 }
-                case ::Event::CONSOLE_BUTTONPRESS: {
+                case RoEvent::CONSOLE_BUTTONPRESS: {
                     const ButtonPressEvent& press = ev.u.buttonPress;
                     if(press.button == 2) {
                         try_again = false;

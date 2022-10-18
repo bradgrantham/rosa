@@ -358,44 +358,44 @@ void ProcessKey(int press, int key)
     }
 }
 
-KeyRepeatManager keyRepeat;
+RoKeyRepeatManager keyRepeat;
 
 void HandleEvents()
 {
-    ::Event ev;
+    RoEvent ev;
     int haveEvent;
 
     do {
         haveEvent = RoEventPoll(&ev);
         
-        haveEvent = KeyRepeatUpdate(&keyRepeat, haveEvent, &ev);
+        haveEvent = RoKeyRepeatUpdate(&keyRepeat, haveEvent, &ev);
 
         if(haveEvent) {
 
             switch(ev.eventType) {
 
-                case ::Event::MOUSE_MOVE: {
+                case RoEvent::MOUSE_MOVE: {
                     const MouseMoveEvent& move = ev.u.mouseMove;
                     (void)move;
                     // Enqueue joystick?
                     break;
                 }
 
-                case ::Event::CONSOLE_BUTTONPRESS: {
+                case RoEvent::CONSOLE_BUTTONPRESS: {
                     const ButtonPressEvent& press = ev.u.buttonPress;
                     if(press.button == 0) {
                         event_queue.push_back({RESET, 0});
                     }
                 }
 
-                case ::Event::MOUSE_BUTTONPRESS: {
+                case RoEvent::MOUSE_BUTTONPRESS: {
                     const ButtonPressEvent& press = ev.u.buttonPress;
                     if(press.button == 0) {
                         // Enqueue joystick?
                     }
                 }
 
-                case ::Event::KEYBOARD_RAW: {
+                case RoEvent::KEYBOARD_RAW: {
                     const KeyboardRawEvent& raw = ev.u.keyboardRaw;
                     ProcessKey(raw.isPress, raw.key);
                     break;
