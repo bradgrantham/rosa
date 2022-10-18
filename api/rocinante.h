@@ -268,7 +268,16 @@ void RoNTSCGetValueRange(unsigned char *black, unsigned char *white);
 
 extern void RoNTSCWaitFrame(void);
 
+//----------------------------------------------------------------------------
+// Flash system LED and infinite loop
+
 void RoPanic(void);
+
+//----------------------------------------------------------------------------
+// Timing convenience functions
+
+void RoDelayMillis(uint32_t millis);
+uint32_t RoGetMillis();
 
 #ifdef __cplusplus
 };
