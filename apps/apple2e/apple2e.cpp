@@ -2294,7 +2294,6 @@ static void sleep_for(int32_t millis)
 
 extern "C" {
 int apple2_main(int argc, const char **argv);
-int main_iterate(void);
 };
 
 
@@ -2497,7 +2496,7 @@ int apple2_main(int argc, const char **argv)
                 uint32_t nowTick = RoGetMillis();
 #warning Setting this to + 16 made USB keyboard stop working.  
                 if(nowTick >= prevTick) {
-                    main_iterate();
+                    RoDoHousekeeping();
                     prevTick = nowTick;
                 }
                 if(debug & DEBUG_CLOCK) {

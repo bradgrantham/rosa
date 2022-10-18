@@ -1760,7 +1760,6 @@ void set_colecovision_context(ColecovisionContext *colecovision_context, RAMboar
 
 extern "C" {
 int coleco_main(int argc, char **argv);
-void main_iterate(void);
 };
 
 #define main coleco_main
@@ -2186,7 +2185,7 @@ int main(int argc, char **argv)
             uint32_t nowTick = RoGetMillis();
 #warning Setting this to + 16 made USB keyboard stop working.  
             if(nowTick >= prevTick + 16) {
-                main_iterate();
+                RoDoHousekeeping();
                 prevTick = nowTick;
             }
 #endif

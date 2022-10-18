@@ -172,7 +172,6 @@ struct Resampler
 
 extern "C" {
 int mp3player_main(int argc, char **argv);
-void main_iterate(void);
 };
 
 #define main mp3player_main
@@ -290,7 +289,7 @@ int main(int argc, char **argv)
         uint32_t nowTick = RoGetMillis();
 #warning Setting this to + 16 made USB keyboard stop working.  
         if(nowTick >= prevTick + 16) {
-            main_iterate();
+            RoDoHousekeeping();
             prevTick = nowTick;
         }
 #endif
