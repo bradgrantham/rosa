@@ -47,10 +47,6 @@ void RoDisplayStringCentered(const char *message)
     RoTextModeSetLine(h / 2, (w - strlen(message)) / 2, TEXT_NO_ATTRIBUTES, message);
 }
 
-extern "C" {
-    void main_iterate(void);
-};
-
 void RoDisplayStringAndWaitForEnter(const char *message)
 {
     RoTextMode();
@@ -72,7 +68,7 @@ void RoDisplayStringAndWaitForEnter(const char *message)
                     break;
             }
         }
-        main_iterate(); // XXX
+        RoDoHousekeeping(); // XXX
     }
 }
 
@@ -191,7 +187,7 @@ Status RoPromptUserToChooseFromList(const char *title, const char* const* items,
             redraw = 1;
         }
 
-        main_iterate(); // XXX
+        RoDoHousekeeping(); // XXX
     }
 
     return status;

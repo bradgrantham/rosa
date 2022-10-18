@@ -268,6 +268,11 @@ void RoNTSCSetMode(int interlaced, RoNTSCModeFillRowBufferFunc fillBufferFunc, R
 extern void RoNTSCWaitFrame(void);
 
 //----------------------------------------------------------------------------
+// Do periodic work that has to happen > 10 times a second
+
+int RoDoHousekeeping(void);
+
+//----------------------------------------------------------------------------
 // Flash system LED and infinite loop
 
 void RoPanic(void);
