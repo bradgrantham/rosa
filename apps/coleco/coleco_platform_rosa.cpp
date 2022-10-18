@@ -203,8 +203,7 @@ void Start(uint32_t& stereoU8SampleRate_, size_t& preferredAudioBufferSizeBytes_
         const uint8_t *c = TMS9918A::Colors[i];
         Pixmap256_192_4b_SetPaletteEntry(i, c[0], c[1], c[2]);
     }
-    RoNTSCSetMode(0, Pixmap256_192_4b_ModeFillRowBuffer, Pixmap256_192_4b_ModeNeedsColorburst);
-    // RoNTSCGetValueRange(&NTSCBlack, &NTSCWhite);
+    RoNTSCSetMode(0, Pixmap256_192_4b_ModeFillRowBuffer, Pixmap256_192_4b_ModeNeedsColorburst, nullptr, nullptr);
 
     RoAudioGetSamplingInfo(&audioSampleRate, &audioChunkLengthBytes);
     stereoU8SampleRate_ = audioSampleRate;
