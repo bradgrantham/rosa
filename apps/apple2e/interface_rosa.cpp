@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cctype>
+#include <cstring>
 #include <deque>
 #include <string>
 #include <vector>
@@ -48,8 +49,7 @@ static constexpr int hires_page_size = 8192;
 #define WOZ_MODE_FONT_HEIGHT 8
 #define WOZ_MODE_FONT_WIDTH 7
 
-enum WozDisplayMode {TEXT, LORES, HIRES};
-enum WozDisplayMode WozModeDisplayMode = TEXT;
+DisplayMode WozModeDisplayMode = TEXT;
 int WozModeAux = 0;
 int WozModeMixed = 0;
 int WozModePage = 0;
@@ -68,6 +68,9 @@ void WozModeClearFlags()
 // indexed by aux, then by page, then by buffer address in scan order, not in Apple ][ memory order
 uint8_t WozModeHGRBuffers[2][2][7680];
 uint8_t WozModeTextBuffers[2][2][960];
+
+static uint8_t NTSCBlack;
+static uint8_t NTSCWhite;
 
 __attribute__((hot,flatten)) void WozModeFillRowBufferHGR(int frameIndex, int rowNumber, size_t maxSamples, uint8_t* rowBuffer)
 {
@@ -468,7 +471,7 @@ int WozModeNeedsColorburst()
 void WozModeFillRowBuffer(int frameIndex, int rowNumber, size_t maxSamples, uint8_t* rowBuffer)
 {
     int rowIndex = (rowNumber - WOZ_MODE_TOP) / 2;
-    enum WozDisplayMode mode = WozModeDisplayMode;
+    DisplayMode mode = WozModeDisplayMode;
     if(WozModeMixed && (rowIndex >= WOZ_MODE_HEIGHT - WOZ_MODE_MIXED_TEXT_ROWS * WOZ_MODE_FONT_HEIGHT)) {
         mode = TEXT;
     }
@@ -528,7 +531,8 @@ tuple<float,bool> get_paddle(int num)
 
 void start(bool run_fast, bool add_floppies, bool floppy0_inserted, bool floppy1_inserted)
 {
-    NTSCSetModeFuncs(0, WozModeFillRowBuffer, WozModeNeedsColorburst);
+    RoNTSCSetMode(0, WozModeFillRowBuffer, WozModeNeedsColorburst);
+    RoNTSCGetValueRange(&NTSCBlack, &NTSCWhite);
     RoAudioGetSamplingInfo(&audioSampleRate, &audioChunkLengthBytes);
     event_queue.push_back({KEYDOWN, CAPS_LOCK});
 }
