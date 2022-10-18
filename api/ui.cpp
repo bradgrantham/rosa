@@ -13,6 +13,7 @@ uint32_t HAL_GetTick(); // XXX
 void RoShowListOfItems(const char *title, const char* const* items, size_t itemsSize, int whichAtTop, int whichSelected)
 {
     int w, h;
+    RoTextMode();
     RoTextModeGetSize(&w, &h);
     RoTextModeClearDisplay();
 
@@ -39,6 +40,7 @@ void RoShowListOfItems(const char *title, const char* const* items, size_t items
 void RoDisplayStringCentered(const char *message)
 {
     int w, h;
+    RoTextMode();
     RoTextModeGetSize(&w, &h);
     RoTextModeClearDisplay();
 
@@ -51,6 +53,7 @@ extern "C" {
 
 void RoDisplayStringAndWaitForEnter(const char *message)
 {
+    RoTextMode();
     RoDisplayStringCentered(message);
     int done = 0;
     while(!done) {
@@ -80,6 +83,8 @@ Status RoPromptUserToChooseFromList(const char *title, const char* const* items,
     int done = 0;
     int redraw = 1;
     Status status = RO_SUCCESS;
+
+    RoTextMode();
 
     RoKeyRepeatManager keyRepeat;
     uint8_t wasPressed = 0;
@@ -204,6 +209,8 @@ Status RoPromptUserToChooseFile(const char *title, const char *dirName, uint32_t
 {
     char *filenames[256];
     size_t filenamesCount = 0;
+
+    RoTextMode();
 
     Status result = RoFillFilenameList(dirName, flags, optionalFilterSuffix, 256, filenames, &filenamesCount);
     if(RO_FAILURE(result)) {
