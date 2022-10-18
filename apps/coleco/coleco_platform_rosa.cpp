@@ -15,6 +15,89 @@
 namespace PlatformInterface
 {
 
+//----------------------------------------------------------------------------
+// 4-bit 256x192 pixmap mode, can support rasterized TMS9918 screen
+
+/* actually 682.6_ 14MHz clocks because 5.3MHz TMS9918A pixel clock */
+/* so the last pixel is extended another 1/3 to fill last clock */
+#define Pixmap256_192_4b_MODE_WIDTH 683
+#define Pixmap256_192_4b_MODE_LEFT ((704 - Pixmap256_192_4b_MODE_WIDTH) / 2) 
+#define Pixmap256_192_4b_MODE_TOP 65 
+#define Pixmap256_192_4b_MODE_HEIGHT 192 
+
+uint8_t Pixmap256_192_4b_Framebuffer[256 / 2 * 192];
+
+uint8_t Pixmap256_192_4b_ColorsToNTSC[16][4];
+
+// XXX TODO: convert original patent waveforms into YIQ
+// May not be able to get the real YIQ values because resistor
+// values are not listed in patent
+void Pixmap256_192_4b_SetPaletteEntry(int color, uint8_t r, uint8_t g, uint8_t b)
+{
+    float y, i, q;
+    RoRGBToYIQ(r / 255.0f, g / 255.0f, b / 255.0f, &y, &i, &q);
+
+    Pixmap256_192_4b_ColorsToNTSC[color][0] = RoNTSCYIQToDAC(y, i, q,  .0f);
+    Pixmap256_192_4b_ColorsToNTSC[color][1] = RoNTSCYIQToDAC(y, i, q, .25f);
+    Pixmap256_192_4b_ColorsToNTSC[color][2] = RoNTSCYIQToDAC(y, i, q, .50f);
+    Pixmap256_192_4b_ColorsToNTSC[color][3] = RoNTSCYIQToDAC(y, i, q, .75f);
+}
+
+uint8_t Pixmap256_192_4b_GetColorIndex(int x, uint8_t *rowColors)
+{
+    if((x & 0b1) == 0) {
+        return rowColors[x / 2] & 0xF;
+    } else {
+        return (rowColors[x / 2] & 0xF0) >> 4;
+    }
+}
+
+int Pixmap256_192_4b_ModeNeedsColorburst()
+{
+    return 1;
+}
+
+
+__attribute__((hot,flatten)) void Pixmap256_192_4b_ModeFillRowBuffer(int frameIndex, int rowNumber, size_t maxSamples, uint8_t* rowBuffer)
+{
+    int rowIndex = (rowNumber - Pixmap256_192_4b_MODE_TOP) / 2;
+    if((rowIndex >= 0) && (rowIndex < 192)) {
+        uint8_t* rowColors = Pixmap256_192_4b_Framebuffer + rowIndex * 128;
+
+        // convert rowColors to NTSC waveform into rowDst 2 2/3 samples at a time.  8-|
+        uint16_t index = Pixmap256_192_4b_MODE_LEFT;
+
+        for(int i = 0; i < 255; i += 3) {
+            // First color covers 2 and 2/3 of a pixel
+            uint8_t *color = Pixmap256_192_4b_ColorsToNTSC[Pixmap256_192_4b_GetColorIndex(i, rowColors)];
+            rowBuffer[index + 0] = color[(index + 0) % 4];
+            rowBuffer[index + 1] = color[(index + 1) % 4];
+            uint8_t carry_over = color[(index + 2) % 4];
+
+            // second color covers 1/3, 2, and 1/3 of a pixel
+            color = Pixmap256_192_4b_ColorsToNTSC[Pixmap256_192_4b_GetColorIndex(i + 1, rowColors)];
+            rowBuffer[index + 2] = (carry_over * 6 + color[(index + 2) % 4] * 3) / 9;
+            rowBuffer[index + 3] = color[(index + 3) % 4];
+            rowBuffer[index + 4] = color[(index + 4) % 4];
+            carry_over = color[(index + 5) % 4];
+
+            // third color covers 2/3 and 2 pixels
+            color = Pixmap256_192_4b_ColorsToNTSC[Pixmap256_192_4b_GetColorIndex(i + 2, rowColors)];
+            rowBuffer[index + 5] = (carry_over * 3 + color[(index + 5) % 4] * 6) / 9;
+            rowBuffer[index + 6] = color[(index + 6) % 4];
+            rowBuffer[index + 7] = color[(index + 7) % 4];
+
+            index += 8;
+        }
+        // And last pixel is special case
+        uint8_t *color = Pixmap256_192_4b_ColorsToNTSC[Pixmap256_192_4b_GetColorIndex(255, rowColors)];
+        rowBuffer[index + 0] = color[(index + 0) % 4];
+        rowBuffer[index + 1] = color[(index + 1) % 4];
+        rowBuffer[index + 2] = color[(index + 2) % 4];
+    }
+}
+
+
 std::deque<Event> event_queue;
 
 bool EventIsWaiting()
@@ -116,6 +199,13 @@ std::chrono::time_point<std::chrono::system_clock> start_of_frame;
 
 void Start(uint32_t& stereoU8SampleRate_, size_t& preferredAudioBufferSizeBytes_)
 {
+    for(int i = 0; i < 16; i++) {
+        const uint8_t *c = TMS9918A::Colors[i];
+        Pixmap256_192_4b_SetPaletteEntry(i, c[0], c[1], c[2]);
+    }
+    RoNTSCSetMode(0, Pixmap256_192_4b_ModeFillRowBuffer, Pixmap256_192_4b_ModeNeedsColorburst);
+    // RoNTSCGetValueRange(&NTSCBlack, &NTSCWhite);
+
     RoAudioGetSamplingInfo(&audioSampleRate, &audioChunkLengthBytes);
     stereoU8SampleRate_ = audioSampleRate;
     preferredAudioBufferSizeBytes_ = audioChunkLengthBytes;
@@ -319,13 +409,6 @@ void HandleEvents()
     } while(haveEvent);
 }
 
-extern "C" {
-
-extern uint8_t Pixmap256_192_4b_Framebuffer[256 / 2 * 192];
-extern void NTSCWaitFrame(void);
-
-}
-
 void Frame(const uint8_t* vdp_registers, const uint8_t* vdp_ram, uint8_t& vdp_status_result, [[maybe_unused]] float megahertz)
 {
     using namespace std::chrono_literals;
@@ -343,7 +426,7 @@ void Frame(const uint8_t* vdp_registers, const uint8_t* vdp_ram, uint8_t& vdp_st
     std::chrono::time_point<std::chrono::system_clock> end_of_frame = std::chrono::system_clock::now();
     std::chrono::duration<float> frame_time = end_of_frame - start_of_frame;
 
-    NTSCWaitFrame();
+    RoNTSCWaitFrame();
     std::chrono::time_point<std::chrono::system_clock> end_of_wait = std::chrono::system_clock::now();
     std::chrono::duration<float> wait_time = end_of_wait - end_of_frame;
     if(frame_time.count() > .0166) {
