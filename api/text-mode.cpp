@@ -85,6 +85,5 @@ void RoTextModeSetLine(int row, int column, uint8_t attributes, const char *stri
 
 void RoTextMode()
 {
-    RoNTSCGetValueRange(&NTSCBlack, &NTSCWhite);
-    RoNTSCSetMode(0, RoTextModeFillRowBuffer, RoTextModeNeedsColorburst);
+    RoNTSCSetMode(0, RoTextModeFillRowBuffer, RoTextModeNeedsColorburst, &NTSCBlack, &NTSCWhite);
 }
