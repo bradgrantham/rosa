@@ -531,8 +531,8 @@ tuple<float,bool> get_paddle(int num)
 
 void start(bool run_fast, bool add_floppies, bool floppy0_inserted, bool floppy1_inserted)
 {
-    RoNTSCSetMode(0, WozModeFillRowBuffer, WozModeNeedsColorburst);
     RoNTSCGetValueRange(&NTSCBlack, &NTSCWhite);
+    RoNTSCSetMode(0, WozModeFillRowBuffer, WozModeNeedsColorburst);
     RoAudioGetSamplingInfo(&audioSampleRate, &audioChunkLengthBytes);
     event_queue.push_back({KEYDOWN, CAPS_LOCK});
 }
