@@ -72,8 +72,40 @@ size_t RoAudioEnqueueSamplesBlocking(size_t writeSize /* in bytes */, uint8_t* b
 */
 void RoAudioClear();
 
+
+//----------------------------------------------------------------------------
+// File operations
+
+typedef enum RoFileChooserFlags {
+    CHOOSE_FILE_NO_FLAGS = 0,
+    CHOOSE_FILE_IGNORE_DOTFILES = 0x01,
+} RoFileChooserFlags;
+
+Status RoFillFilenameList(const char* dirName, uint32_t flags, const char* optionalFilterSuffix, size_t maxNames, char **filenames, size_t* filenamesSize);
+
 //----------------------------------------------------------------------------
 // Controllers; joysticks, keypads
+
+enum {
+    CONTROLLER_FIRE_BIT = 0x40,
+    CONTROLLER_NORTH_BIT = 0x01,
+    CONTROLLER_EAST_BIT = 0x02,
+    CONTROLLER_SOUTH_BIT = 0x04,
+    CONTROLLER_WEST_BIT = 0x08,
+    CONTROLLER_KEYPAD_MASK = 0x0F,
+    CONTROLLER_KEYPAD_0 = 0x05,
+    CONTROLLER_KEYPAD_1 = 0x02,
+    CONTROLLER_KEYPAD_2 = 0x08,
+    CONTROLLER_KEYPAD_3 = 0x03,
+    CONTROLLER_KEYPAD_4 = 0x0D,
+    CONTROLLER_KEYPAD_5 = 0x0C,
+    CONTROLLER_KEYPAD_6 = 0x01,
+    CONTROLLER_KEYPAD_7 = 0x0A,
+    CONTROLLER_KEYPAD_8 = 0x0E,
+    CONTROLLER_KEYPAD_9 = 0x04,
+    CONTROLLER_KEYPAD_asterisk = 0x09,
+    CONTROLLER_KEYPAD_pound = 0x06,
+};
 
 typedef enum RoControllerIndex { CONTROLLER_1, CONTROLLER_2 } RoControllerIndex;
 
