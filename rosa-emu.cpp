@@ -432,8 +432,6 @@ Status RoFillFilenameList(const char* dirName, uint32_t flags, const char* optio
         struct dirent* ent;
         while((ent = readdir(dir)) != nullptr) {
 
-            printf("    %s\n", ent->d_name);
-
             bool addToList = false;
 
             if (ent->d_type == DT_DIR) {                    /* It is a directory */
