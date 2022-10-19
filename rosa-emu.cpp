@@ -5,6 +5,7 @@
 #include <chrono>
 #include <array>
 #include <dirent.h>
+#include <unistd.h>
 #include "SDL.h"
 
 #include "rocinante.h"
@@ -381,6 +382,14 @@ void RoDebugOverlayPrintf(const char *fmt, ...)
         printf("called unimplemented %s\n", __func__);
         once = true;
     }
+    static char buffer[512];
+    va_list args;
+
+    va_start(args, fmt);
+    vsnprintf(buffer, sizeof(buffer), fmt, args);
+    va_end(args);
+
+    puts(buffer);
 }
 
 void RoDebugOverlaySetLine(int line, const char *str, size_t size)
@@ -417,7 +426,6 @@ Status RoFillFilenameList(const char* dirName, uint32_t flags, const char* optio
 
     DIR* dir;
 
-    printf("%s\n", dirName);
     dir = opendir(dirName);
     if(dir != nullptr) {
 
@@ -593,10 +601,45 @@ extern "C" {
     implement DebugOverlay
 */
 
-int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
+void usage(const char *progname) 
+{
+    printf("usage: %s [options]\n", progname);
+    printf("options:\n");
+    printf("\t--root-dir DIR     # use DIR as the root directory for emulation\n");
+}
+
+int main(int argc, char **argv)
 {
     uint32_t stereoU8SampleRate;
     size_t preferredAudioBufferSizeBytes;
+
+    const char *rootDirName = nullptr;
+
+    const char *progname = argv[0];
+    argv++;
+    argc--;
+
+    while(argc > 0) {
+        if(strcmp(argv[0], "--root-dir") == 0) {
+            if(argc < 2) {
+                fprintf(stderr, "expected root directory for \"--root-dir\"\n");
+                usage(progname);
+                exit(EXIT_FAILURE);
+            }
+            rootDirName = argv[1];
+            argv += 2;
+            argc -= 2;
+        } else {
+            fprintf(stderr, "unknown option \"%s\"\n", argv[0]);
+            usage(progname);
+            exit(0);
+        }
+    }
+
+    if((rootDirName != nullptr) && (chdir(rootDirName) != 0)) {
+        perror("chdir");
+        exit(EXIT_FAILURE);
+    }
 
     memset(samples, 0xaa, sizeof(samples));
 
