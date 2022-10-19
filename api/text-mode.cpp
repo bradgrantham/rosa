@@ -23,7 +23,7 @@ __attribute__((hot,flatten)) void RoTextModeFillRowBuffer([[maybe_unused]] int f
 {
     int fontScanlineHeight = font8x16Height * TextModeFontHeightScale;
 
-    int rowWithinTextArea = rowNumber / 2 - TextModeTopTick;
+    int rowWithinTextArea = rowNumber - TextModeTopTick;
 
     int charRow = rowWithinTextArea / fontScanlineHeight;
     int charPixelY = (rowWithinTextArea % fontScanlineHeight) / TextModeFontHeightScale;
