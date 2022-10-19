@@ -528,8 +528,12 @@ void RoNTSCSetMode(int interlaced_, RoNTSCModeFillRowBufferFunc fillBufferFunc_,
     NTSCModeInterlaced = interlaced_;
 
     /* Should these be similar to HW values to exercise reduced precision? */
-    *blackvalue = 0;
-    *whitevalue = 255;
+    if(blackvalue != nullptr) {
+        *blackvalue = 0;
+    }
+    if(whitevalue != nullptr) {
+        *whitevalue = 255;
+    }
 
     NTSCModeFuncsValid = true;
 }
