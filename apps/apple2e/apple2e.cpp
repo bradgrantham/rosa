@@ -418,7 +418,7 @@ bool nybblizeTrackFromFile(FILE *floppyImageFile, int trackIndex, uint8_t *nybbl
         size_t wasRead = fread(sectorBytes, 1, sectorSize, floppyImageFile);
         if(wasRead != sectorSize) {
             fprintf(stderr, "failed to read sector from floppy disk image\n");
-            printf("track %d, sectorIndex %d, skew %d, offset %d, read %zd\n", trackIndex, sectorIndex, skew[sectorIndex], sectorOffset, wasRead);
+            printf("track %d, sectorIndex %d, skew %d, offset %" PRIu32 ", read %zd\n", trackIndex, sectorIndex, skew[sectorIndex], sectorOffset, wasRead);
             return false;
         }
 
@@ -839,7 +839,7 @@ struct DISKIIboard : board_base
         uint8_t data = trackBytes[trackByteIndex];
 
         if(false) {
-            printf("read track %d byte %d (sector %ld byte %ld), yields %d (%02X)\n", nybblizedTrackIndex, trackByteIndex, trackByteIndex / DiskII::nybblizedSectorSize, trackByteIndex % DiskII::nybblizedSectorSize, data, data);
+            printf("read track %d byte %" PRIu32 " (sector %ld byte %ld), yields %d (%02X)\n", nybblizedTrackIndex, trackByteIndex, trackByteIndex / DiskII::nybblizedSectorSize, trackByteIndex % DiskII::nybblizedSectorSize, data, data);
         }
 
         trackByteIndex = (trackByteIndex + 1) % DiskII::nybblizedTrackSize;
@@ -969,7 +969,7 @@ struct DISKIIboard : board_base
 
         driveMagnetState[driveSelected] = newMagnetState;
 
-        if(debug & DEBUG_FLOPPY) printf("stepper %04X, phase %d, state %d, so stepper motor state now: %d, %d, %d, %d\n",
+        if(debug & DEBUG_FLOPPY) printf("stepper %04" PRIX32 ", phase %d, state %d, so stepper motor state now: %d, %d, %d, %d\n",
             addr, phase, state,
             newMagnetState[0] ? 1 : 0, newMagnetState[1] ? 1 : 0, newMagnetState[2] ? 1 : 0, newMagnetState[3] ? 1 : 0);
 
@@ -2502,7 +2502,7 @@ int apple2_main(int argc, const char **argv)
                 }
 #endif
                 if(debug & DEBUG_CLOCK) {
-                    printf("clock = %u, %u\n", (uint32_t)(clk / (1LLU << 32)), (uint32_t)(clk % (1LLU << 32)));
+                    printf("clock = %" PRIu32 ", %" PRIu32 "\n", (uint32_t)(clk / (1LLU << 32)), (uint32_t)(clk % (1LLU << 32)));
                 }
             }
             mainboard->sync();
@@ -2571,8 +2571,8 @@ int apple2_main(int argc, const char **argv)
                 exit_on_banking = true;
                 continue;
             } else if(strncmp(line, "debug", 5) == 0) {
-                sscanf(line + 6, "%u", &debug);
-                printf("debug set to %02X\n", debug);
+                sscanf(line + 6, "%" SCNu32, &debug);
+                printf("debug set to %02" PRIu32 "\n", debug);
                 continue;
             } else if(strcmp(line, "reset") == 0) {
                 printf("machine reset.\n");
