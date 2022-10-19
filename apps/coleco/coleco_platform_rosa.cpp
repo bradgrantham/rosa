@@ -22,8 +22,9 @@ namespace PlatformInterface
 /* so the last pixel is extended another 1/3 to fill last clock */
 #define Pixmap256_192_4b_MODE_WIDTH 683
 #define Pixmap256_192_4b_MODE_LEFT ((704 - Pixmap256_192_4b_MODE_WIDTH) / 2) 
-#define Pixmap256_192_4b_MODE_TOP 65 
+// 65 
 #define Pixmap256_192_4b_MODE_HEIGHT 192 
+#define Pixmap256_192_4b_MODE_TOP (240 / 2 - Pixmap256_192_4b_MODE_HEIGHT / 2);
 
 uint8_t Pixmap256_192_4b_Framebuffer[256 / 2 * 192];
 

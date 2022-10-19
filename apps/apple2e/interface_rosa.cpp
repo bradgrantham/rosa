@@ -43,8 +43,8 @@ static constexpr int hires_page_size = 8192;
 
 #define WOZ_MODE_LEFT 72 
 #define WOZ_MODE_WIDTH 560 
-#define WOZ_MODE_TOP 60 
 #define WOZ_MODE_HEIGHT 192 
+#define WOZ_MODE_TOP (240 / 2 - WOZ_MODE_HEIGHT / 2) 
 #define WOZ_MODE_MIXED_TEXT_ROWS 4
 #define WOZ_MODE_FONT_HEIGHT 8
 #define WOZ_MODE_FONT_WIDTH 7
