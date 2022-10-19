@@ -4,6 +4,7 @@
 #include <thread>
 #include <chrono>
 #include <array>
+#include <dirent.h>
 #include "SDL.h"
 
 #include "rocinante.h"
@@ -41,7 +42,7 @@ SDL_Surface *surface;
 
 const static int SCREEN_X = 704;
 const static int SCREEN_Y = 480;
-const static int SCREEN_SCALE = 1;
+const static int SCREEN_SCALE = 2;
 
 void Start(uint32_t& stereoU8SampleRate, size_t& preferredAudioBufferSizeBytes)
 {
@@ -375,7 +376,11 @@ uint8_t samples[SCREEN_X * SCREEN_Y];
 void RoDebugOverlayPrintf(const char *fmt, ...)
 {
     (void)fmt;
-    printf("called unimplemented %s\n", __func__);
+    static bool once = false;
+    if(!once) {
+        printf("called unimplemented %s\n", __func__);
+        once = true;
+    }
 }
 
 void RoDebugOverlaySetLine(int line, const char *str, size_t size)
@@ -383,7 +388,11 @@ void RoDebugOverlaySetLine(int line, const char *str, size_t size)
     (void)line;
     (void)str;
     (void)size;
-    printf("called unimplemented %s\n", __func__);
+    static bool once = false;
+    if(!once) {
+        printf("called unimplemented %s\n", __func__);
+        once = true;
+    }
 }
 
 void RoAudioGetSamplingInfo(float *rate, size_t *chunkSize)
@@ -400,32 +409,99 @@ size_t RoAudioEnqueueSamplesBlocking(size_t writeSize /* in bytes */, uint8_t* b
 
 void RoAudioClear()
 {
-    // printf("called unimplemented %s\n", __func__);
 }
 
 Status RoFillFilenameList(const char* dirName, uint32_t flags, const char* optionalFilterSuffix, size_t maxNames, char **filenames, size_t* filenamesSize)
 {
-    (void)dirName;
-    (void)flags;
-    (void)optionalFilterSuffix;
-    (void)maxNames;
-    (void)filenames;
-    (void)filenamesSize;
-    printf("called unimplemented %s\n", __func__);
-    return RO_INVALID_PARAMETER_VALUE;
+    Status status = RO_SUCCESS;
+
+    DIR* dir;
+
+    printf("%s\n", dirName);
+    dir = opendir(dirName);
+    if(dir != nullptr) {
+
+        struct dirent* ent;
+        while((ent = readdir(dir)) != nullptr) {
+
+            printf("    %s\n", ent->d_name);
+
+            bool addToList = false;
+
+            if (ent->d_type == DT_DIR) {                    /* It is a directory */
+                // XXX Really should have a way to descend into directories.
+                addToList = false;
+            } else if(ent->d_type == DT_REG) {
+                if((ent->d_name[0] == '.') && (flags & CHOOSE_FILE_IGNORE_DOTFILES)) {
+                    addToList = false;
+                } else if(optionalFilterSuffix && (strcmp(optionalFilterSuffix, ent->d_name + ent->d_namlen - strlen(optionalFilterSuffix)) != 0)) {
+                    addToList = false;
+                } else {
+                    addToList = true;
+                }
+            }
+
+            if(addToList) {
+                if(*filenamesSize > maxNames - 1) {
+                    printf("maxNames would be exceeded\n");
+                    closedir(dir);
+                    return RO_RESOURCE_EXHAUSTED;
+                }
+                int which = *filenamesSize;
+                filenames[which] = (char*)malloc(ent->d_namlen + 1);
+                if(filenames[which] == nullptr) {
+                    printf("malloc for filenames[which] failed\n");
+                    closedir(dir);
+                    return RO_RESOURCE_EXHAUSTED;
+                }
+
+                memcpy(filenames[which], ent->d_name, ent->d_namlen);
+                filenames[which][ent->d_namlen] = '\0';
+
+                (*filenamesSize)++;
+            }
+        }
+
+        // if(errno != 0) {
+            // printf("failed to readdir - %d\n", errno);
+            // status = RO_INVALID_PARAMETER_VALUE;
+        // }
+
+        closedir(dir);
+
+    } else {
+
+        if(*filenamesSize > maxNames - 1) {
+            printf("maxNames would be exceeded\n");
+            return RO_RESOURCE_EXHAUSTED;
+        }
+        filenames[(*filenamesSize)++] = strdup("failed to opendir");
+        status = RO_RESOURCE_NOT_FOUND;
+
+    }
+
+    return status;
 }
 
 uint8_t RoGetJoystickState(RoControllerIndex which)
 {
     (void)which;
-    printf("called unimplemented %s\n", __func__);
+    static bool once = false;
+    if(!once) {
+        printf("called unimplemented %s\n", __func__);
+        once = true;
+    }
     return 0;
 }
 
 uint8_t RoGetKeypadState(RoControllerIndex which)
 {
     (void)which;
-    printf("called unimplemented %s\n", __func__);
+    static bool once = false;
+    if(!once) {
+        printf("called unimplemented %s\n", __func__);
+        once = true;
+    }
     return 0;
 }
 
@@ -452,7 +528,11 @@ void RoNTSCSetMode(int interlaced_, RoNTSCModeFillRowBufferFunc fillBufferFunc_,
 
 extern void RoNTSCWaitFrame(void)
 {
-    printf("called unimplemented %s\n", __func__);
+    static bool once = false;
+    if(!once) {
+        printf("called unimplemented %s\n", __func__);
+        once = true;
+    }
 }
 
 void RoDelayMillis(uint32_t millis)
