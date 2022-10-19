@@ -1,17 +1,13 @@
 #include "events.h"
 #include "rocinante.h"
 
-extern "C" {
-uint32_t HAL_GetTick(); // XXX
-};
-
 // TODO don't repeat modifier keys!
 void RoKeyRepeatPress(RoKeyRepeatManager *mgr, int pressed)
 {
     if(mgr->key != pressed) {
         mgr->key = pressed;
         mgr->state = RoKeyRepeatManager::PRESSED;
-        mgr->lastMilli = HAL_GetTick();
+        mgr->lastMilli = RoGetMillis();
     }
 }
 
@@ -25,7 +21,7 @@ void RoKeyRepeatRelease(RoKeyRepeatManager *mgr, int released)
 
 int RoKeyRepeatUpdate(RoKeyRepeatManager *mgr, int haveEvent, RoEvent* ev)
 {
-    int now = HAL_GetTick();
+    int now = RoGetMillis();
 
     if(haveEvent) {
         switch(ev->eventType) {

@@ -19,7 +19,7 @@ static char TextModeBuffer[TextModeHeight * TextModeWidth];
 
 static uint8_t NTSCBlack, NTSCWhite;
 
-__attribute__((hot,flatten)) void RoTextModeFillRowBuffer(int frameIndex, int rowNumber, size_t maxSamples, uint8_t* rowBuffer)
+__attribute__((hot,flatten)) void RoTextModeFillRowBuffer([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
     int fontScanlineHeight = font8x16Height * TextModeFontHeightScale;
 
