@@ -1,4 +1,7 @@
 #include <cstdio>
+#include <cstdlib>
+#include <cassert>
+#include <chrono>
 #include <array>
 #include "SDL.h"
 
@@ -15,14 +18,14 @@ void EnqueueStereoU8AudioSamples(uint8_t *buf, size_t sz)
         std::array<uint8_t, 2048> lead_in;
         size_t sampleCount = lead_in.size() / 2;
         for(size_t i = 0; i < sampleCount; i++) {
-            lead_in[i * 2 + 0] = 128 + (buf[0] - 128) * i / sampleCount;
-            lead_in[i * 2 + 1] = 128 + (buf[0] - 128) * i / sampleCount;
+            lead_in[i * 2 + 0] = static_cast<uint8_t>(128 + (buf[0] - 128) * i / sampleCount);
+            lead_in[i * 2 + 1] = static_cast<uint8_t>(128 + (buf[0] - 128) * i / sampleCount);
         }
-        SDL_QueueAudio(audio_device, lead_in.data(), lead_in.size());
+        SDL_QueueAudio(audio_device, lead_in.data(), static_cast<uint32_t>(lead_in.size()));
     }
 
     if(actual_audio_format == AUDIO_U8) {
-        SDL_QueueAudio(audio_device, buf, sz);
+        SDL_QueueAudio(audio_device, buf, static_cast<uint32_t>(sz));
     }
 }
 
@@ -99,7 +102,6 @@ void Start(uint32_t& stereoU8SampleRate, size_t& preferredAudioBufferSizeBytes)
 }
 
 bool shift_pressed = false;
-
 bool quit_requested = false;
 
 static void HandleEvents(void)
@@ -108,9 +110,9 @@ static void HandleEvents(void)
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
             case SDL_WINDOWEVENT:
-                printf("window event %d\n", event.window.event);
-                switch(event.window.event) {
-                }
+                // printf("window event %d\n", event.window.event);
+                // switch(event.window.event) {
+                // }
                 break;
             case SDL_QUIT:
                 quit_requested = true;
@@ -305,14 +307,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
 #else /* !EMSCRIPTEN */
 
-    bool quit_requested = false;
-    while(!quit_requested)
+    bool quit_requested_ = false;
+    while(!quit_requested_)
     {
-        quit_requested = Iterate();
+        quit_requested_ = Iterate();
     }
 
     SDL_Quit();
 
 #endif /* EMSCRIPTEN */
 
+    return 0;
 }
