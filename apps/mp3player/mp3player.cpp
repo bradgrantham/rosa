@@ -57,11 +57,11 @@ ao_device *open_ao(int rate)
 
 #else /* defined(ROSA) */
 
-bool audio_needs_start = true;
-float audioSampleRate;
-size_t audioChunkLengthBytes;
+static bool audio_needs_start = true;
+static float audioSampleRate;
+static size_t audioChunkLengthBytes;
 
-void EnqueueStereoU8AudioSamples(uint8_t *buf, size_t sz)
+static void EnqueueStereoU8AudioSamples(uint8_t *buf, size_t sz)
 {
     if(audio_needs_start) {
         RoAudioClear();
