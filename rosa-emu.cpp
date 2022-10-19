@@ -5,6 +5,9 @@
 #include <array>
 #include "SDL.h"
 
+#include "rocinante.h"
+#include "events.h"
+
 SDL_AudioDeviceID audio_device;
 bool audio_needs_start = true;
 SDL_AudioFormat actual_audio_format;
@@ -284,12 +287,128 @@ void caller(void *f_)
 
 uint8_t samples[SCREEN_X * SCREEN_Y];
 
-bool Iterate(void)
+int RoEventPoll(RoEvent *event)
 {
-    Frame(samples);
     HandleEvents();
-    return quit_requested;
+    if(quit_requested) {
+        SDL_Quit();
+        exit(0);
+    }
+    printf("called unimplemented %s\n", __func__);
 }
+
+void RoDebugOverlayPrintf(const char *fmt, ...)
+{
+    printf("called unimplemented %s\n", __func__);
+}
+
+void RoDebugOverlaySetLine(int line, const char *str, size_t size)
+{
+    printf("called unimplemented %s\n", __func__);
+}
+
+void RoAudioGetSamplingInfo(float *rate, size_t *chunkSize)
+{
+    *rate = 44100;
+    *chunkSize = 1024;
+}
+
+size_t RoAudioEnqueueSamplesBlocking(size_t writeSize /* in bytes */, uint8_t* buffer)
+{
+    EnqueueStereoU8AudioSamples(buffer, writeSize);
+}
+
+void RoAudioClear()
+{
+    // printf("called unimplemented %s\n", __func__);
+}
+
+Status RoFillFilenameList(const char* dirName, uint32_t flags, const char* optionalFilterSuffix, size_t maxNames, char **filenames, size_t* filenamesSize)
+{
+    printf("called unimplemented %s\n", __func__);
+}
+
+uint8_t RoGetJoystickState(RoControllerIndex which)
+{
+    printf("called unimplemented %s\n", __func__);
+}
+
+uint8_t RoGetKeypadState(RoControllerIndex which)
+{
+    printf("called unimplemented %s\n", __func__);
+}
+
+bool NTSCModeFuncsValid = false;
+RoNTSCModeFillRowBufferFunc NTSCModeFillRowBuffer;
+RoNTSCModeNeedsColorburstFunc NTSCModeNeedsColorburst;
+bool NTSCModeInterlaced = false;
+
+void RoNTSCSetMode(int interlaced_, RoNTSCModeFillRowBufferFunc fillBufferFunc_, RoNTSCModeNeedsColorburstFunc needsColorBurstFunc_, unsigned char *blackvalue, unsigned char *whitevalue)
+{
+    // XXX Need to lock here versus any threaded access to these variables
+    NTSCModeFuncsValid = false;
+
+    NTSCModeFillRowBuffer = fillBufferFunc_;
+    NTSCModeNeedsColorburst = needsColorBurstFunc_;
+    NTSCModeInterlaced = interlaced_;
+
+    /* Should these be similar to HW values to exercise reduced precision? */
+    *blackvalue = 0;
+    *whitevalue = 255;
+
+    NTSCModeFuncsValid = true;
+}
+
+extern void RoNTSCWaitFrame(void)
+{
+    printf("called unimplemented %s\n", __func__);
+}
+
+void RoDelayMillis(uint32_t millis)
+{
+    printf("called unimplemented %s\n", __func__);
+}
+
+uint32_t RoGetMillis()
+{
+    printf("called unimplemented %s\n", __func__);
+}
+
+int RoDoHousekeeping(void)
+{
+    // XXX if time has sufficiently elapsed
+    if(NTSCModeInterlaced) {
+        for(int lineNumber = 0; lineNumber < 480; lineNumber++) {
+            if(NTSCModeFuncsValid) {
+                NTSCModeFillRowBuffer(0, lineNumber, 704, samples + lineNumber * 704);
+            }
+        }
+    } else {
+        for(int lineNumber = 0; lineNumber < 240; lineNumber++) {
+            if(NTSCModeFuncsValid) {
+                NTSCModeFillRowBuffer(0, lineNumber, 704, samples + (lineNumber * 2 + 0) * 704);
+                memcpy(samples + (lineNumber * 2 + 1) * 704, samples + (lineNumber * 2 + 0) * 704, 704);
+            }
+        }
+    }
+
+    Frame(samples);
+}
+
+extern "C" {
+    int launcher_main(int argc, const char **argv);
+}
+
+/*
+    make thread filling the samples buffer
+        like STM32 RowHandler, incrementing linenumber and frame number etc
+        track time - as close as possible to 15... KHz
+        call row funcs
+    implement RoGetMillis and RoDelay
+    wrap elapsed time around Frame(samples)
+    implement EventPoll
+    implement DebugOverlay
+*/
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
@@ -307,11 +426,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
 #else /* !EMSCRIPTEN */
 
-    bool quit_requested_ = false;
-    while(!quit_requested_)
-    {
-        quit_requested_ = Iterate();
-    }
+    const char *args[] = {
+        "launcher",
+    };
+    launcher_main(sizeof(args) / sizeof(args[0]), args);
 
     SDL_Quit();
 
