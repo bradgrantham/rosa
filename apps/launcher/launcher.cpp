@@ -28,8 +28,8 @@ int launcher_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
                 char *fileChosenInDir;
                 char fileChosen[512];
 
-                status = RoPromptUserToChooseFile("Choose an MP3 File", "/", CHOOSE_FILE_IGNORE_DOTFILES, ".mp3", &fileChosenInDir);
-                sprintf(fileChosen, "/%s", fileChosenInDir);
+                status = RoPromptUserToChooseFile("Choose an MP3 File", ".", CHOOSE_FILE_IGNORE_DOTFILES, ".mp3", &fileChosenInDir);
+                sprintf(fileChosen, "./%s", fileChosenInDir);
                 if(status == RO_SUCCESS) {
                     const char *args[] = {
                         "mp3player",
@@ -45,8 +45,8 @@ int launcher_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
                 char *fileChosenInDir;
                 char fileChosen[512];
 
-                status = RoPromptUserToChooseFile("Choose a Coleco Cartridge", "/coleco", CHOOSE_FILE_IGNORE_DOTFILES, NULL /* ".dsk" */, &fileChosenInDir);
-                sprintf(fileChosen, "/coleco/%s", fileChosenInDir);
+                status = RoPromptUserToChooseFile("Choose a Coleco Cartridge", "coleco", CHOOSE_FILE_IGNORE_DOTFILES, NULL /* ".dsk" */, &fileChosenInDir);
+                sprintf(fileChosen, "coleco/%s", fileChosenInDir);
                 if(status == RO_SUCCESS) {
                     const char *args[] = {
                         "emulator",
@@ -65,8 +65,8 @@ int launcher_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
                 char *fileChosenInDir;
                 char fileChosen[512];
 
-                status = RoPromptUserToChooseFile("Choose an Apple ][ boot disk", "/floppies", CHOOSE_FILE_IGNORE_DOTFILES, NULL /* ".dsk" */, &fileChosenInDir);
-                sprintf(fileChosen, "/floppies/%s", fileChosenInDir);
+                status = RoPromptUserToChooseFile("Choose an Apple ][ boot disk", "floppies", CHOOSE_FILE_IGNORE_DOTFILES, NULL /* ".dsk" */, &fileChosenInDir);
+                sprintf(fileChosen, "floppies/%s", fileChosenInDir);
                 if(status == RO_SUCCESS) {
                     const char *args[] = {
                         "apple2e",
