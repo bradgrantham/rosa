@@ -2003,7 +2003,7 @@ void write6502(uint16_t address, uint8_t value)
 
 #endif /* SUPPORT_FAKE_6502 */
 
-void usage(const char *progname)
+static void usage(const char *progname)
 {
     printf("\n");
     printf("usage: %s [options] ROM.bin\n", progname);
