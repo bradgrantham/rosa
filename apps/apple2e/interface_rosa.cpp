@@ -74,7 +74,7 @@ static uint8_t NTSCWhite;
 
 __attribute__((hot,flatten)) void WozModeFillRowBufferHGR([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
-    int rowIndex = (rowNumber - WOZ_MODE_TOP) / 2;
+    int rowIndex = rowNumber - WOZ_MODE_TOP;
     uint8_t darker = NTSCBlack + (NTSCWhite - NTSCBlack) / 4; // XXX debug
     if((rowIndex >= 0) && (rowIndex < 192)) {
         const uint8_t *rowSrc = WozModeHGRBuffers[WozModeAux][WozModePage] + rowIndex * 40; // row - ...?
@@ -112,7 +112,7 @@ __attribute__((hot,flatten)) void WozModeFillRowBufferHGR([[maybe_unused]] int f
 
 __attribute__((hot,flatten)) void WozModeFillRowBufferDHGR([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
-    int rowIndex = (rowNumber - WOZ_MODE_TOP) / 2;
+    int rowIndex = rowNumber - WOZ_MODE_TOP;
     if((rowIndex >= 0) && (rowIndex < 192)) {
         const uint8_t *rowSrc;
         
@@ -374,7 +374,7 @@ void WozMemoryByteToFontIndex(int byte, int *fontIndex, int *inverse)
 
 void WozModeFillRowBuffer80Text([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
-    int rowIndex = (rowNumber - WOZ_MODE_TOP) / 2;
+    int rowIndex = rowNumber - WOZ_MODE_TOP;
     if((rowIndex >= 0) && (rowIndex < 192)) {
         memset(rowBuffer + WOZ_MODE_LEFT, NTSCBlack, WOZ_MODE_WIDTH);
         int rowInText = rowIndex / 8;
@@ -415,7 +415,7 @@ void WozModeFillRowBuffer80Text([[maybe_unused]] int frameIndex, int rowNumber, 
 
 void WozModeFillRowBuffer40Text([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
-    int rowIndex = (rowNumber - WOZ_MODE_TOP) / 2;
+    int rowIndex = rowNumber - WOZ_MODE_TOP;
     if((rowIndex >= 0) && (rowIndex < 192)) {
         memset(rowBuffer + WOZ_MODE_LEFT, NTSCBlack, WOZ_MODE_WIDTH);
         int rowInText = rowIndex / 8;
@@ -438,7 +438,7 @@ void WozModeFillRowBuffer40Text([[maybe_unused]] int frameIndex, int rowNumber, 
 
 void WozModeFillRowBufferLGR([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
-    int rowIndex = (rowNumber - WOZ_MODE_TOP) / 2;
+    int rowIndex = rowNumber - WOZ_MODE_TOP;
     if((rowIndex >= 0) && (rowIndex < 192)) {
 
         memset(rowBuffer + WOZ_MODE_LEFT, NTSCBlack, WOZ_MODE_WIDTH);
@@ -470,7 +470,7 @@ int WozModeNeedsColorburst()
 
 void WozModeFillRowBuffer(int frameIndex, int rowNumber, size_t maxSamples, uint8_t* rowBuffer)
 {
-    int rowIndex = (rowNumber - WOZ_MODE_TOP) / 2;
+    int rowIndex = rowNumber - WOZ_MODE_TOP;
     DisplayMode mode = WozModeDisplayMode;
     if(WozModeMixed && (rowIndex >= WOZ_MODE_HEIGHT - WOZ_MODE_MIXED_TEXT_ROWS * WOZ_MODE_FONT_HEIGHT)) {
         mode = TEXT;

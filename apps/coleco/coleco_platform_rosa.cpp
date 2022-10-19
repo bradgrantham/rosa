@@ -60,7 +60,7 @@ int Pixmap256_192_4b_ModeNeedsColorburst()
 
 __attribute__((hot,flatten)) void Pixmap256_192_4b_ModeFillRowBuffer([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
-    int rowIndex = (rowNumber - Pixmap256_192_4b_MODE_TOP) / 2;
+    int rowIndex = rowNumber - Pixmap256_192_4b_MODE_TOP;
     if((rowIndex >= 0) && (rowIndex < 192)) {
         uint8_t* rowColors = Pixmap256_192_4b_Framebuffer + rowIndex * 128;
 
