@@ -567,17 +567,41 @@ int RoDoHousekeeping(void)
         exit(0);
     }
 
+    bool needsColorburst = NTSCModeNeedsColorburst();
+
     // XXX if time has sufficiently elapsed
     if(NTSCModeInterlaced) {
         for(int lineNumber = 0; lineNumber < 480; lineNumber++) {
             if(NTSCModeFuncsValid) {
+                memset(samples + lineNumber * 704, 128, 704);
                 NTSCModeFillRowBuffer(0, lineNumber, 704, samples + lineNumber * 704);
+                if(needsColorburst) {
+                    // blur for now
+                    for(int x = 0; x < 704 - 3; x++) {
+                        samples[lineNumber * 704 + x + 0] =
+                            samples[lineNumber * 704 + x + 0] * .2 +
+                            samples[lineNumber * 704 + x + 1] * .3 + 
+                            samples[lineNumber * 704 + x + 2] * .3 +
+                            samples[lineNumber * 704 + x + 3] * .2;
+                    }
+                }
             }
         }
     } else {
         for(int lineNumber = 0; lineNumber < 240; lineNumber++) {
             if(NTSCModeFuncsValid) {
+                memset(samples + (lineNumber * 2 + 0) * 704, 128, 704);
                 NTSCModeFillRowBuffer(0, lineNumber, 704, samples + (lineNumber * 2 + 0) * 704);
+                if(needsColorburst) {
+                    // blur for now
+                    for(int x = 0; x < 704 - 3; x++) {
+                        samples[(lineNumber * 2 + 0) * 704 + x + 0] =
+                            samples[(lineNumber * 2 + 0) * 704 + x + 0] * .2 +
+                            samples[(lineNumber * 2 + 0) * 704 + x + 1] * .3 + 
+                            samples[(lineNumber * 2 + 0) * 704 + x + 2] * .3 +
+                            samples[(lineNumber * 2 + 0) * 704 + x + 3] * .2;
+                    }
+                }
                 memcpy(samples + (lineNumber * 2 + 1) * 704, samples + (lineNumber * 2 + 0) * 704, 704);
             }
         }
@@ -643,7 +667,7 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    memset(samples, 0xaa, sizeof(samples));
+    memset(samples, 128, sizeof(samples));
 
     Start(stereoU8SampleRate, preferredAudioBufferSizeBytes);
 
