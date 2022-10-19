@@ -7,7 +7,7 @@
 // Text Mode
 
 #define TextModeLeftTick 64
-#define TextModeTopTick (NTSC_EQPULSE_LINES + NTSC_VSYNC_LINES + NTSC_EQPULSE_LINES + NTSC_VBLANK_LINES + 10)
+#define TextModeTopRow 10
 #define TextModeFontWidthScale 2
 #define TextModeCharGapPixels 1
 #define TextModeFontHeightScale 1
@@ -23,7 +23,7 @@ __attribute__((hot,flatten)) void RoTextModeFillRowBuffer([[maybe_unused]] int f
 {
     int fontScanlineHeight = font8x16Height * TextModeFontHeightScale;
 
-    int rowWithinTextArea = rowNumber - TextModeTopTick;
+    int rowWithinTextArea = rowNumber - TextModeTopRow;
 
     int charRow = rowWithinTextArea / fontScanlineHeight;
     int charPixelY = (rowWithinTextArea % fontScanlineHeight) / TextModeFontHeightScale;
