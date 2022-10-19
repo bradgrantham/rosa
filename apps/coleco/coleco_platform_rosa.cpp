@@ -10,7 +10,7 @@
 
 #include "rocinante.h"
 #include "events.h"
-#include "hid.h"
+// #include "hid.h"
 
 namespace PlatformInterface
 {
@@ -58,7 +58,7 @@ int Pixmap256_192_4b_ModeNeedsColorburst()
 }
 
 
-__attribute__((hot,flatten)) void Pixmap256_192_4b_ModeFillRowBuffer(int frameIndex, int rowNumber, size_t maxSamples, uint8_t* rowBuffer)
+__attribute__((hot,flatten)) void Pixmap256_192_4b_ModeFillRowBuffer([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
     int rowIndex = (rowNumber - Pixmap256_192_4b_MODE_TOP) / 2;
     if((rowIndex >= 0) && (rowIndex < 192)) {
@@ -422,15 +422,7 @@ void Frame(const uint8_t* vdp_registers, const uint8_t* vdp_ram, uint8_t& vdp_st
         // previous_event_time = now;
     // }
 
-    std::chrono::time_point<std::chrono::system_clock> end_of_frame = std::chrono::system_clock::now();
-    std::chrono::duration<float> frame_time = end_of_frame - start_of_frame;
-
     RoNTSCWaitFrame();
-    std::chrono::time_point<std::chrono::system_clock> end_of_wait = std::chrono::system_clock::now();
-    std::chrono::duration<float> wait_time = end_of_wait - end_of_frame;
-    if(frame_time.count() > .0166) {
-        // RoDebugOverlayPrintf("%4d %4d\n", (int)(frame_time.count() * 1000.0), (int)(wait_time.count() * 1000.0));
-    }
     vdp_status_result = TMS9918A::Create4BitPixmap(vdp_registers, vdp_ram, Pixmap256_192_4b_Framebuffer);
     start_of_frame = std::chrono::system_clock::now();
 }

@@ -418,7 +418,7 @@ bool nybblizeTrackFromFile(FILE *floppyImageFile, int trackIndex, uint8_t *nybbl
         size_t wasRead = fread(sectorBytes, 1, sectorSize, floppyImageFile);
         if(wasRead != sectorSize) {
             fprintf(stderr, "failed to read sector from floppy disk image\n");
-            printf("track %d, sectorIndex %d, skew %d, offset %ld, read %zd\n", trackIndex, sectorIndex, skew[sectorIndex], sectorOffset, wasRead);
+            printf("track %d, sectorIndex %d, skew %d, offset %d, read %zd\n", trackIndex, sectorIndex, skew[sectorIndex], sectorOffset, wasRead);
             return false;
         }
 
@@ -839,7 +839,7 @@ struct DISKIIboard : board_base
         uint8_t data = trackBytes[trackByteIndex];
 
         if(false) {
-            printf("read track %d byte %ld (sector %ld byte %ld), yields %d (%02X)\n", nybblizedTrackIndex, trackByteIndex, trackByteIndex / DiskII::nybblizedSectorSize, trackByteIndex % DiskII::nybblizedSectorSize, data, data);
+            printf("read track %d byte %d (sector %ld byte %ld), yields %d (%02X)\n", nybblizedTrackIndex, trackByteIndex, trackByteIndex / DiskII::nybblizedSectorSize, trackByteIndex % DiskII::nybblizedSectorSize, data, data);
         }
 
         trackByteIndex = (trackByteIndex + 1) % DiskII::nybblizedTrackSize;
@@ -969,7 +969,7 @@ struct DISKIIboard : board_base
 
         driveMagnetState[driveSelected] = newMagnetState;
 
-        if(debug & DEBUG_FLOPPY) printf("stepper %04lX, phase %d, state %d, so stepper motor state now: %d, %d, %d, %d\n",
+        if(debug & DEBUG_FLOPPY) printf("stepper %04X, phase %d, state %d, so stepper motor state now: %d, %d, %d, %d\n",
             addr, phase, state,
             newMagnetState[0] ? 1 : 0, newMagnetState[1] ? 1 : 0, newMagnetState[2] ? 1 : 0, newMagnetState[3] ? 1 : 0);
 
@@ -1489,7 +1489,7 @@ struct MAINboard : board_base
         std::copy(rom_image + rom_C400.base - 0x8000, rom_image + rom_C400.base - 0x8000 + rom_C400.size, rom_C400.memory.begin());
         std::copy(rom_image + rom_C800.base - 0x8000, rom_image + rom_C800.base - 0x8000 + rom_C800.size, rom_C800.memory.begin());
 
-        printf("audio buffer samples %d\n", actual_audio_buffer_size);
+        printf("audio buffer samples %zd\n", actual_audio_buffer_size);
         printf("audio rate %d\n", actual_sample_rate);
 
         repage_regions("init");
@@ -2493,14 +2493,16 @@ int apple2_main(int argc, const char **argv)
                         print_cpu_state(cpu);
                     }
                 }
+#if defined(ROSA)
                 uint32_t nowTick = RoGetMillis();
-#warning Setting this to + 16 made USB keyboard stop working.  
+                // Setting this to + 16 made USB keyboard stop working.  
                 if(nowTick >= prevTick) {
                     RoDoHousekeeping();
                     prevTick = nowTick;
                 }
+#endif
                 if(debug & DEBUG_CLOCK) {
-                    printf("clock = %lu, %lu\n", (uint32_t)(clk / (1LLU << 32)), (uint32_t)(clk % (1LLU << 32)));
+                    printf("clock = %u, %u\n", (uint32_t)(clk / (1LLU << 32)), (uint32_t)(clk % (1LLU << 32)));
                 }
             }
             mainboard->sync();
@@ -2569,8 +2571,8 @@ int apple2_main(int argc, const char **argv)
                 exit_on_banking = true;
                 continue;
             } else if(strncmp(line, "debug", 5) == 0) {
-                sscanf(line + 6, "%lu", &debug);
-                printf("debug set to %02lX\n", debug);
+                sscanf(line + 6, "%u", &debug);
+                printf("debug set to %02X\n", debug);
                 continue;
             } else if(strcmp(line, "reset") == 0) {
                 printf("machine reset.\n");

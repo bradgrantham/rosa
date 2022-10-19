@@ -9,7 +9,7 @@ int apple2_main(int argc, const char **argv);
 int coleco_main(int argc, const char **argv);
 int mp3player_main(int argc, const char **argv);
 
-int launcher_main(int argc, char **argv)
+int launcher_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
     while(1) {
         RoTextMode();

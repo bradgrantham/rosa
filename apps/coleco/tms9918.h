@@ -527,8 +527,9 @@ static void DrawSprites(int row, const uint8_t* registers, const uint8_t* memory
 
 static void AddSpritesToRow(int row, uint8_t row_colors[TMS9918A::SCREEN_X], const uint8_t* registers, const uint8_t* memory, uint8_t& flags_set)
 {
-    auto RowSetPixel = [row_colors, row](int x, int y, int color) {
+    auto RowSetPixel = [row_colors, row](int x, [[maybe_unused]] int y, int color) {
         // We know row is constant so ignore it.
+        (void)row;
         if(row_colors) {
             row_colors[x] = color;
         }

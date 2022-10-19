@@ -14,9 +14,9 @@
 
 #include "interface.h"
 
-#include "hid.h"
 #include "events.h"
 #include "rocinante.h"
+// #include "hid.h"
 
 using namespace std;
 
@@ -72,7 +72,7 @@ uint8_t WozModeTextBuffers[2][2][960];
 static uint8_t NTSCBlack;
 static uint8_t NTSCWhite;
 
-__attribute__((hot,flatten)) void WozModeFillRowBufferHGR(int frameIndex, int rowNumber, size_t maxSamples, uint8_t* rowBuffer)
+__attribute__((hot,flatten)) void WozModeFillRowBufferHGR([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
     int rowIndex = (rowNumber - WOZ_MODE_TOP) / 2;
     uint8_t darker = NTSCBlack + (NTSCWhite - NTSCBlack) / 4; // XXX debug
@@ -110,7 +110,7 @@ __attribute__((hot,flatten)) void WozModeFillRowBufferHGR(int frameIndex, int ro
     }
 }
 
-__attribute__((hot,flatten)) void WozModeFillRowBufferDHGR(int frameIndex, int rowNumber, size_t maxSamples, uint8_t* rowBuffer)
+__attribute__((hot,flatten)) void WozModeFillRowBufferDHGR([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
     int rowIndex = (rowNumber - WOZ_MODE_TOP) / 2;
     if((rowIndex >= 0) && (rowIndex < 192)) {
@@ -372,7 +372,7 @@ void WozMemoryByteToFontIndex(int byte, int *fontIndex, int *inverse)
         *fontIndex = 33;
 }
 
-void WozModeFillRowBuffer80Text(int frameIndex, int rowNumber, size_t maxSamples, uint8_t* rowBuffer)
+void WozModeFillRowBuffer80Text([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
     int rowIndex = (rowNumber - WOZ_MODE_TOP) / 2;
     if((rowIndex >= 0) && (rowIndex < 192)) {
@@ -413,7 +413,7 @@ void WozModeFillRowBuffer80Text(int frameIndex, int rowNumber, size_t maxSamples
     }
 }
 
-void WozModeFillRowBuffer40Text(int frameIndex, int rowNumber, size_t maxSamples, uint8_t* rowBuffer)
+void WozModeFillRowBuffer40Text([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
     int rowIndex = (rowNumber - WOZ_MODE_TOP) / 2;
     if((rowIndex >= 0) && (rowIndex < 192)) {
@@ -436,7 +436,7 @@ void WozModeFillRowBuffer40Text(int frameIndex, int rowNumber, size_t maxSamples
     }
 }
 
-void WozModeFillRowBufferLGR(int frameIndex, int rowNumber, size_t maxSamples, uint8_t* rowBuffer)
+void WozModeFillRowBufferLGR([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
     int rowIndex = (rowNumber - WOZ_MODE_TOP) / 2;
     if((rowIndex >= 0) && (rowIndex < 192)) {
@@ -529,7 +529,7 @@ tuple<float,bool> get_paddle(int num)
     return make_tuple(0, false);
 }
 
-void start(bool run_fast, bool add_floppies, bool floppy0_inserted, bool floppy1_inserted)
+void start(bool, bool, bool, bool)
 {
     RoNTSCSetMode(0, WozModeFillRowBuffer, WozModeNeedsColorburst, &NTSCBlack, &NTSCWhite);
     RoAudioGetSamplingInfo(&audioSampleRate, &audioChunkLengthBytes);
@@ -767,7 +767,7 @@ void enqueue_ascii(int key)
     }
 }
 
-void map_history_to_lines(const ModeHistory& history, unsigned long long current_byte)
+void map_history_to_lines(const ModeHistory& history, [[maybe_unused]] unsigned long long current_byte)
 {
 #if 0
     for(const auto& modePoint: history) {
@@ -787,7 +787,7 @@ void map_history_to_lines(const ModeHistory& history, unsigned long long current
     }
 }
 
-void iterate(const ModeHistory& history, unsigned long long current_byte, float megahertz)
+void iterate(const ModeHistory& history, unsigned long long current_byte, [[maybe_unused]] float megahertz)
 {
     apply_writes();
 
@@ -889,7 +889,7 @@ bool write(uint16_t addr, bool aux, uint8_t data)
     return false;
 }
 
-void show_floppy_activity(int number, bool activity)
+void show_floppy_activity([[maybe_unused]] int number, bool activity)
 {
     if(activity) {
         // RoLEDSet(1 + number, 255, 0, 0);

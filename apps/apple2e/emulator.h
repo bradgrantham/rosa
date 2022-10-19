@@ -6,9 +6,9 @@
 
 struct board_base
 {
-    virtual bool write(int addr, unsigned char data) { return false; }
-    virtual bool read(int addr, unsigned char &data) { return false; }
-    virtual bool board_get_interrupt(int& irq) { return false; }
+    virtual bool write(int addr, unsigned char data) { (void)addr; (void)data; return false; }
+    virtual bool read(int addr, unsigned char &data) { (void)addr; (void)data; return false; }
+    virtual bool board_get_interrupt(int& irq) { (void)irq; return false; }
 
     virtual void reset(void) {}
     virtual void idle(void) {};

@@ -14,7 +14,7 @@
 
 #include "rocinante.h"
 #include "events.h"
-#include "hid.h"
+// #include "hid.h"
 
 #define printf RoDebugOverlayPrintf
 
@@ -287,8 +287,8 @@ int main(int argc, char **argv)
 #if defined(ROSA)
 
         uint32_t nowTick = RoGetMillis();
-#warning Setting this to + 16 made USB keyboard stop working.  
-        if(nowTick >= prevTick + 16) {
+        // Setting this to + 16 made USB keyboard stop working.  
+        if(nowTick >= prevTick) {
             RoDoHousekeeping();
             prevTick = nowTick;
         }

@@ -350,7 +350,7 @@ struct SN76489A
                 }
                 audio_buffer_next_sample++;
 
-                if(audio_buffer_next_sample == audio_buffer_samples) {
+                if(audio_buffer_next_sample == static_cast<clk_t>(audio_buffer_samples)) {
                     stereo_audio_flush(stereo_audio_buffer.data(), audio_buffer_samples * 2);
                     audio_buffer_next_sample = 0;
                 }
@@ -409,6 +409,7 @@ struct TMS9918AEmulator
     void set_register(uint8_t which_register, uint8_t data)
     {
         using namespace TMS9918A;
+        (void)data;
         registers[which_register] = cmd_data;
         interrupt_status = InterruptsAreEnabled(registers.data()) && VSyncInterruptHasOccurred(status_register);
     }
@@ -749,6 +750,8 @@ int disassemble(uint16_t address, std::function<const std::string& (uint16_t add
     // FB5C conin+0x0002         e6     AND A, n        ff          ;  AND of ff to reg
 
 #else
+
+    (void)bytecount;
 
     uint16_t symbol_offset;
     uint8_t buffer[3];
@@ -1622,7 +1625,7 @@ void Debugger::go(FILE *fp, Z80_STATE* state)
 
 struct Debugger
 {
-    Debugger(ColecoHW *colecohw, ColecovisionContext *colecovision_context, clk_t& clk) {}
+    Debugger(ColecoHW *, ColecovisionContext *, clk_t&) {}
 };
 
 #endif /* PROVIDE_DEBUGGER */
@@ -2183,8 +2186,8 @@ int main(int argc, char **argv)
 
 #if defined(ROSA)
             uint32_t nowTick = RoGetMillis();
-#warning Setting this to + 16 made USB keyboard stop working.  
-            if(nowTick >= prevTick + 16) {
+            // Setting this to + 16 made USB keyboard stop working.  
+            if(nowTick >= prevTick) {
                 RoDoHousekeeping();
                 prevTick = nowTick;
             }
