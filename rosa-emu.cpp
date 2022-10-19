@@ -1,12 +1,14 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cassert>
+#include <thread>
 #include <chrono>
 #include <array>
 #include "SDL.h"
 
 #include "rocinante.h"
 #include "events.h"
+#include "events_internal.h"
 
 SDL_AudioDeviceID audio_device;
 bool audio_needs_start = true;
@@ -123,101 +125,184 @@ static void HandleEvents(void)
 
             case SDL_KEYDOWN:
                 switch (event.key.keysym.scancode) {
-                    case SDL_SCANCODE_Q:
-                        quit_requested = true;
-                        break;
-                    case SDL_SCANCODE_RSHIFT:
-                    case SDL_SCANCODE_LSHIFT:
-                        shift_pressed = true;
-                        break;
-                    case SDL_SCANCODE_W:
-                        break;
-                    case SDL_SCANCODE_A:
-                        break;
-                    case SDL_SCANCODE_S:
-                        break;
-                    case SDL_SCANCODE_D:
-                        break;
-                    case SDL_SCANCODE_SPACE:
-                        break;
-                    case SDL_SCANCODE_RETURN:
-                        break;
-                    case SDL_SCANCODE_0:
-                        break;
-                    case SDL_SCANCODE_1:
-                        break;
-                    case SDL_SCANCODE_2:
-                        break;
-                    case SDL_SCANCODE_3:
-                        if(shift_pressed) {
-                        } else {
-                        }
-                        break;
-                    case SDL_SCANCODE_4:
-                        break;
-                    case SDL_SCANCODE_5:
-                        break;
-                    case SDL_SCANCODE_6:
-                        break;
-                    case SDL_SCANCODE_7:
-                        break;
-                    case SDL_SCANCODE_8:
-                        if(shift_pressed) {
-                        } else {
-                        }
-                        break;
-                    case SDL_SCANCODE_9:
-                        break;
-                    default:
-                        break;
+                    case SDL_SCANCODE_A: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_A }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_B: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_B }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_C: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_C }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_D: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_D }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_E: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_E }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_F }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_G: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_G }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_H: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_H }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_I: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_I }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_J: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_J }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_K: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_K }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_L: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_L }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_M: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_M }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_N: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_N }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_O: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_O }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_P: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_P }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_Q: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_Q }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_R: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_R }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_S: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_S }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_T: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_T }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_U: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_U }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_V: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_V }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_W: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_W }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_X: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_X }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_Y: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_Y }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_Z: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_Z }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_1: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_1_EXCLAMATION }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_2: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_2_AT }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_3: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_3_NUMBER }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_4: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_4_DOLLAR }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_5: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_5_PERCENT }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_6: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_6_CARET }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_7: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_7_AMPERSAND }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_8: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_8_ASTERISK }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_9: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_9_OPAREN }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_0: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_0_CPAREN }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_RETURN: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_ENTER }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_ESCAPE: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_ESCAPE }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_BACKSPACE: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_BACKSPACE }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_TAB: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_TAB }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_SPACE: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_SPACE }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_MINUS: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_HYPHEN_UNDER }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_EQUALS: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_EQUAL_PLUS }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_LEFTBRACKET: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_OBRACKET_OBRACE }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_RIGHTBRACKET: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_CBRACKET_CBRACE }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_BACKSLASH: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_BACKSLASH_PIPE }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_SEMICOLON: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_SEMICOLON_COLON }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_APOSTROPHE: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_SINGLEQUOTE_DOUBLEQUOTE }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_GRAVE: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_GRAVE_TILDE }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_COMMA: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_COMMA_LESS }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_PERIOD: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_PERIOD_GREATER }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_SLASH: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_SLASH_QUESTION }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_CAPSLOCK: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_CAPSLOCK }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F1: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_F1 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F2: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_F2 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F3: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_F3 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F4: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_F4 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F5: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_F5 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F6: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_F6 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F7: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_F7 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F8: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_F8 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F9: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_F9 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F10: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_F10 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F11: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_F11 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F12: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_F12 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_PRINTSCREEN: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_PRTSCN }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_SCROLLLOCK: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_SCRLK }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_PAUSE: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_PAUSE }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_INSERT: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_INSERT }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_HOME: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_HOME }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_PAGEUP: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_PAGEUP }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_DELETE: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_DELETE }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_END: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_END }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_PAGEDOWN: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_PGDN }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_RIGHT: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_RIGHT }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_LEFT: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_LEFT }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_DOWN: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_DOWN }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_UP: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_UP }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_LCTRL: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_LEFTCONTROL }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_LSHIFT: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_LEFTSHIFT }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_LALT: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_LEFTALT }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_LGUI: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_LEFTGUI }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_RCTRL: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_RIGHTCONTROL }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_RSHIFT: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_RIGHTSHIFT }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_RALT: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_RIGHTALT }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_RGUI: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {1, KEYCAP_RIGHTGUI }}}; SystemEventEnqueue(e); } break;
+                    default: break;
                 }
                 break;
             case SDL_KEYUP:
                 switch (event.key.keysym.scancode) {
-                    case SDL_SCANCODE_V:
-                        break;
-                    case SDL_SCANCODE_N:
-                        break;
-                    case SDL_SCANCODE_R:
-                        break;
-                    case SDL_SCANCODE_RSHIFT:
-                    case SDL_SCANCODE_LSHIFT:
-                        shift_pressed = false;
-                        break;
-                    case SDL_SCANCODE_W:
-                        break;
-                    case SDL_SCANCODE_A:
-                        break;
-                    case SDL_SCANCODE_S:
-                        break;
-                    case SDL_SCANCODE_D:
-                        break;
-                    case SDL_SCANCODE_SPACE:
-                        break;
-                    case SDL_SCANCODE_RETURN:
-                        break;
-                    case SDL_SCANCODE_0:
-                        break;
-                    case SDL_SCANCODE_1:
-                        break;
-                    case SDL_SCANCODE_2:
-                        break;
-                    case SDL_SCANCODE_3:
-                        break;
-                    case SDL_SCANCODE_4:
-                        break;
-                    case SDL_SCANCODE_5:
-                        break;
-                    case SDL_SCANCODE_6:
-                        break;
-                    case SDL_SCANCODE_7:
-                        break;
-                    case SDL_SCANCODE_8:
-                        break;
-                    case SDL_SCANCODE_9:
-                        break;
-                    default:
-                        break;
+                    case SDL_SCANCODE_A: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_A }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_B: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_B }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_C: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_C }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_D: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_D }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_E: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_E }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_F }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_G: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_G }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_H: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_H }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_I: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_I }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_J: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_J }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_K: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_K }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_L: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_L }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_M: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_M }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_N: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_N }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_O: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_O }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_P: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_P }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_Q: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_Q }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_R: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_R }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_S: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_S }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_T: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_T }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_U: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_U }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_V: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_V }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_W: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_W }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_X: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_X }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_Y: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_Y }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_Z: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_Z }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_1: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_1_EXCLAMATION }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_2: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_2_AT }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_3: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_3_NUMBER }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_4: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_4_DOLLAR }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_5: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_5_PERCENT }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_6: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_6_CARET }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_7: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_7_AMPERSAND }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_8: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_8_ASTERISK }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_9: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_9_OPAREN }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_0: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_0_CPAREN }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_RETURN: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_ENTER }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_ESCAPE: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_ESCAPE }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_BACKSPACE: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_BACKSPACE }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_TAB: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_TAB }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_SPACE: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_SPACE }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_MINUS: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_HYPHEN_UNDER }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_EQUALS: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_EQUAL_PLUS }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_LEFTBRACKET: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_OBRACKET_OBRACE }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_RIGHTBRACKET: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_CBRACKET_CBRACE }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_BACKSLASH: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_BACKSLASH_PIPE }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_SEMICOLON: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_SEMICOLON_COLON }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_APOSTROPHE: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_SINGLEQUOTE_DOUBLEQUOTE }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_GRAVE: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_GRAVE_TILDE }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_COMMA: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_COMMA_LESS }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_PERIOD: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_PERIOD_GREATER }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_SLASH: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_SLASH_QUESTION }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_CAPSLOCK: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_CAPSLOCK }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F1: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_F1 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F2: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_F2 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F3: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_F3 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F4: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_F4 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F5: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_F5 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F6: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_F6 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F7: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_F7 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F8: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_F8 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F9: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_F9 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F10: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_F10 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F11: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_F11 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_F12: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_F12 }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_PRINTSCREEN: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_PRTSCN }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_SCROLLLOCK: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_SCRLK }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_PAUSE: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_PAUSE }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_INSERT: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_INSERT }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_HOME: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_HOME }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_PAGEUP: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_PAGEUP }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_DELETE: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_DELETE }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_END: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_END }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_PAGEDOWN: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_PGDN }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_RIGHT: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_RIGHT }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_LEFT: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_LEFT }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_DOWN: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_DOWN }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_UP: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_UP }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_LCTRL: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_LEFTCONTROL }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_LSHIFT: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_LEFTSHIFT }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_LALT: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_LEFTALT }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_LGUI: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_LEFTGUI }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_RCTRL: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_RIGHTCONTROL }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_RSHIFT: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_RIGHTSHIFT }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_RALT: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_RIGHTALT }}}; SystemEventEnqueue(e); } break;
+                    case SDL_SCANCODE_RGUI: { RoEvent e { .eventType = RoEvent::KEYBOARD_RAW, .u = {.keyboardRaw = {0, KEYCAP_RIGHTGUI }}}; SystemEventEnqueue(e); } break;
+                    default: break;
                 }
                 break;
             default:
@@ -287,23 +372,17 @@ void caller(void *f_)
 
 uint8_t samples[SCREEN_X * SCREEN_Y];
 
-int RoEventPoll(RoEvent *event)
-{
-    HandleEvents();
-    if(quit_requested) {
-        SDL_Quit();
-        exit(0);
-    }
-    printf("called unimplemented %s\n", __func__);
-}
-
 void RoDebugOverlayPrintf(const char *fmt, ...)
 {
+    (void)fmt;
     printf("called unimplemented %s\n", __func__);
 }
 
 void RoDebugOverlaySetLine(int line, const char *str, size_t size)
 {
+    (void)line;
+    (void)str;
+    (void)size;
     printf("called unimplemented %s\n", __func__);
 }
 
@@ -316,6 +395,7 @@ void RoAudioGetSamplingInfo(float *rate, size_t *chunkSize)
 size_t RoAudioEnqueueSamplesBlocking(size_t writeSize /* in bytes */, uint8_t* buffer)
 {
     EnqueueStereoU8AudioSamples(buffer, writeSize);
+    return 0; // XXX ?
 }
 
 void RoAudioClear()
@@ -325,17 +405,28 @@ void RoAudioClear()
 
 Status RoFillFilenameList(const char* dirName, uint32_t flags, const char* optionalFilterSuffix, size_t maxNames, char **filenames, size_t* filenamesSize)
 {
+    (void)dirName;
+    (void)flags;
+    (void)optionalFilterSuffix;
+    (void)maxNames;
+    (void)filenames;
+    (void)filenamesSize;
     printf("called unimplemented %s\n", __func__);
+    return RO_INVALID_PARAMETER_VALUE;
 }
 
 uint8_t RoGetJoystickState(RoControllerIndex which)
 {
+    (void)which;
     printf("called unimplemented %s\n", __func__);
+    return 0;
 }
 
 uint8_t RoGetKeypadState(RoControllerIndex which)
 {
+    (void)which;
     printf("called unimplemented %s\n", __func__);
+    return 0;
 }
 
 bool NTSCModeFuncsValid = false;
@@ -366,16 +457,26 @@ extern void RoNTSCWaitFrame(void)
 
 void RoDelayMillis(uint32_t millis)
 {
-    printf("called unimplemented %s\n", __func__);
+    std::this_thread::sleep_for(std::chrono::milliseconds(millis));
 }
+
+std::chrono::time_point<std::chrono::system_clock> systemStart = std::chrono::system_clock::now();
 
 uint32_t RoGetMillis()
 {
-    printf("called unimplemented %s\n", __func__);
+    std::chrono::time_point<std::chrono::system_clock> now = std::chrono::system_clock::now();
+    auto elapsed_millis = std::chrono::duration_cast<std::chrono::milliseconds>(now - systemStart).count();
+    return elapsed_millis;
 }
 
 int RoDoHousekeeping(void)
 {
+    HandleEvents();
+    if(quit_requested) {
+        SDL_Quit();
+        exit(0);
+    }
+
     // XXX if time has sufficiently elapsed
     if(NTSCModeInterlaced) {
         for(int lineNumber = 0; lineNumber < 480; lineNumber++) {
@@ -393,6 +494,8 @@ int RoDoHousekeeping(void)
     }
 
     Frame(samples);
+
+    return 0;
 }
 
 extern "C" {
