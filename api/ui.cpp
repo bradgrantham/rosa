@@ -6,10 +6,6 @@
 #include "text-mode.h"
 #include "ui.h"
 
-extern "C" {
-uint32_t HAL_GetTick(); // XXX
-};
-
 void RoShowListOfItems(const char *title, const char* const* items, size_t itemsSize, int whichAtTop, int whichSelected)
 {
     int w, h;
@@ -103,9 +99,9 @@ Status RoPromptUserToChooseFromList(const char *title, const char* const* items,
         int firePressed = joystick1 & CONTROLLER_FIRE_BIT;
         if(northPressed || southPressed || firePressed) {
             wasPressed = joystick1;
-            debounceStart = HAL_GetTick();
+            debounceStart = RoGetMillis();
         }
-        uint32_t now = HAL_GetTick();
+        uint32_t now = RoGetMillis();
         if(wasPressed && (joystick1 == 0) && ((now - debounceStart) > 20)) {
             if(wasPressed & CONTROLLER_NORTH_BIT) {
                 moveUpOne = 1;
