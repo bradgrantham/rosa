@@ -147,6 +147,7 @@ typedef struct RoKeyRepeatManager
     uint32_t lastMilli;
 } RoKeyRepeatManager;
 
+void RoKeyRepeatInit(RoKeyRepeatManager *mgr);
 void RoKeyRepeatRelease(RoKeyRepeatManager *mgr, int released);
 void RoKeyRepeatPress(RoKeyRepeatManager *mgr, int pressed);
 int RoKeyRepeatUpdate(RoKeyRepeatManager *mgr, int haveEvent, RoEvent* ev);

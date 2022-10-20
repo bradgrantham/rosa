@@ -1,6 +1,13 @@
 #include "events.h"
 #include "rocinante.h"
 
+void RoKeyRepeatInit(RoKeyRepeatManager *mgr)
+{
+    mgr->key = 0;
+    mgr->state = RoKeyRepeatManager::NONE;
+    mgr->lastMilli = RoGetMillis();
+}
+
 // TODO don't repeat modifier keys!
 void RoKeyRepeatPress(RoKeyRepeatManager *mgr, int pressed)
 {

@@ -79,6 +79,7 @@ Status RoPromptUserToChooseFromList(const char *title, const char* const* items,
     RoTextMode();
 
     RoKeyRepeatManager keyRepeat;
+    RoKeyRepeatInit(&keyRepeat);
     uint8_t wasPressed = 0;
     uint32_t debounceStart = 0;
 
