@@ -66,8 +66,10 @@ void WozModeClearFlags()
     WozModeDHGR = 0;
 }
 // indexed by aux, then by page, then by buffer address in scan order, not in Apple ][ memory order
-uint8_t WozModeHGRBuffers[2][2][7680];
-uint8_t WozModeTextBuffers[2][2][960];
+typedef uint8_t WozModeHGRBuffers_t[2][7680];
+typedef uint8_t WozModeTextBuffers_t[2][960];
+WozModeHGRBuffers_t* WozModeHGRBuffers;
+WozModeTextBuffers_t* WozModeTextBuffers;
 
 static uint8_t NTSCBlack;
 static uint8_t NTSCWhite;
@@ -529,9 +531,27 @@ tuple<float,bool> get_paddle(int num)
     return make_tuple(0, false);
 }
 
+static int WozModeInitVideoMemory(void *videoMemory, uint32_t size, uint8_t black, uint8_t white)
+{
+    auto reserve = [](void*& ptr, uint32_t& remaining, size_t rsv) {
+        void *old = ptr;
+        assert(remaining >= rsv);
+        ptr = static_cast<uint8_t*>(ptr) + rsv;
+        remaining -= rsv;
+        return old;
+    };
+
+    WozModeHGRBuffers = static_cast<WozModeHGRBuffers_t*>(reserve(videoMemory, size, 2 * sizeof(WozModeHGRBuffers_t)));
+    WozModeTextBuffers = static_cast<WozModeTextBuffers_t*>(reserve(videoMemory, size, 2 * sizeof(WozModeTextBuffers_t)));
+    NTSCBlack = black;
+    NTSCWhite = white;
+
+    return 1; // XXX should return 0 here if memory insufficient
+}
+
 void start(bool, bool, bool, bool)
 {
-    RoNTSCSetMode(0, WozModeFillRowBuffer, WozModeNeedsColorburst, &NTSCBlack, &NTSCWhite);
+    RoNTSCSetMode(0, WozModeInitVideoMemory, WozModeFillRowBuffer, WozModeNeedsColorburst);
     RoAudioGetSamplingInfo(&audioSampleRate, &audioChunkLengthBytes);
     event_queue.push_back({KEYDOWN, CAPS_LOCK});
 }

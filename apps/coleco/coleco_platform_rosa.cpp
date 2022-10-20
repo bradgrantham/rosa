@@ -26,7 +26,7 @@ namespace PlatformInterface
 #define Pixmap256_192_4b_MODE_HEIGHT 192 
 #define Pixmap256_192_4b_MODE_TOP (240 / 2 - Pixmap256_192_4b_MODE_HEIGHT / 2);
 
-uint8_t Pixmap256_192_4b_Framebuffer[256 / 2 * 192];
+uint8_t *Pixmap256_192_4b_Framebuffer;
 
 uint8_t Pixmap256_192_4b_ColorsToNTSC[16][4];
 
@@ -56,6 +56,21 @@ uint8_t Pixmap256_192_4b_GetColorIndex(int x, uint8_t *rowColors)
 int Pixmap256_192_4b_ModeNeedsColorburst()
 {
     return 1;
+}
+
+static int Pixmap256_192_4b_ModeInitVideoMemory(void *videoMemory, uint32_t size, uint8_t, uint8_t)
+{
+    auto reserve = [](void*& ptr, uint32_t& remaining, size_t rsv) {
+        void *old = ptr;
+        assert(remaining >= rsv);
+        ptr = static_cast<uint8_t*>(ptr) + rsv;
+        remaining -= rsv;
+        return old;
+    };
+
+    Pixmap256_192_4b_Framebuffer = static_cast<uint8_t*>(reserve(videoMemory, size, 256 / 2 * 192));
+
+    return 1; // XXX should return 0 here if memory insufficient
 }
 
 
@@ -204,7 +219,7 @@ void Start(uint32_t& stereoU8SampleRate_, size_t& preferredAudioBufferSizeBytes_
         const uint8_t *c = TMS9918A::Colors[i];
         Pixmap256_192_4b_SetPaletteEntry(i, c[0], c[1], c[2]);
     }
-    RoNTSCSetMode(0, Pixmap256_192_4b_ModeFillRowBuffer, Pixmap256_192_4b_ModeNeedsColorburst, nullptr, nullptr);
+    RoNTSCSetMode(0, Pixmap256_192_4b_ModeInitVideoMemory, Pixmap256_192_4b_ModeFillRowBuffer, Pixmap256_192_4b_ModeNeedsColorburst);
 
     RoAudioGetSamplingInfo(&audioSampleRate, &audioChunkLengthBytes);
     stereoU8SampleRate_ = audioSampleRate;
