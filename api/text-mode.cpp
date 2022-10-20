@@ -1,4 +1,5 @@
 #include <cstring>
+#include <cassert>
 #include "rocinante.h"
 #include "text-mode.h"
 #include "8x16.h"
@@ -14,10 +15,35 @@
 #define TextModeWidth (604 / (font8x16Width * TextModeFontWidthScale + TextModeCharGapPixels))
 #define TextModeHeight ((218 - 6) / font8x16Height)
 
-static uint8_t TextModeAttributes[TextModeHeight * TextModeWidth];
-static char TextModeBuffer[TextModeHeight * TextModeWidth];
+static uint8_t *TextModeAttributes;
+static char *TextModeBuffer;
 
 static uint8_t NTSCBlack, NTSCWhite;
+
+void RoTextModeClearDisplay()
+{
+    memset(TextModeBuffer, ' ', TextModeWidth * TextModeWidth);
+    memset(TextModeAttributes, TEXT_NO_ATTRIBUTES, TextModeWidth * TextModeWidth);
+}
+
+int RoTextModeInitVideoMemory(void *videoMemory, uint32_t size, uint8_t black, uint8_t white)
+{
+    auto reserve = [](void*& ptr, uint32_t& remaining, size_t rsv) {
+        void *old = ptr;
+        assert(remaining >= rsv);
+        ptr = static_cast<uint8_t*>(ptr) + rsv;
+        remaining -= rsv;
+        return old;
+    };
+
+    TextModeAttributes = static_cast<uint8_t*>(reserve(videoMemory, size, TextModeHeight * TextModeWidth));
+    TextModeBuffer = static_cast<char*>(reserve(videoMemory, size, TextModeHeight * TextModeWidth));
+    NTSCBlack = black;
+    NTSCWhite = white;
+    RoTextModeClearDisplay();
+
+    return 1; // XXX should return 0 here if memory insufficient
+}
 
 __attribute__((hot,flatten)) void RoTextModeFillRowBuffer([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
@@ -51,11 +77,6 @@ __attribute__((hot,flatten)) void RoTextModeFillRowBuffer([[maybe_unused]] int f
     }
 }
 
-void RoTextModeClearDisplay()
-{
-    memset(TextModeBuffer, ' ', sizeof(TextModeBuffer));
-}
-
 void RoTextModeGetSize(int *w, int *h)
 {
     *w = TextModeWidth;
@@ -85,5 +106,5 @@ void RoTextModeSetLine(int row, int column, uint8_t attributes, const char *stri
 
 void RoTextMode()
 {
-    RoNTSCSetMode(0, RoTextModeFillRowBuffer, RoTextModeNeedsColorburst, &NTSCBlack, &NTSCWhite);
+    RoNTSCSetMode(0, RoTextModeInitVideoMemory, RoTextModeFillRowBuffer, RoTextModeNeedsColorburst);
 }

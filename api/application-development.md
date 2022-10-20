@@ -1,8 +1,18 @@
+[TOC]
+
+
+
 # Rocinante ("Rosa" for short) Programming Guide
+
+
 
 ## The Rosa Emulator
 
-Building `rosa-emu` requires SDL2 development libraries.  On Windows one may have to add a CMake SDL2 development package directory using `-DSDL2_DIR=...` .  See https://trenki2.github.io/blog/2017/06/02/using-sdl2-with-cmake/ for more information.
+Building `rosa-emu` requires SDL2 development libraries.
+
+On Windows one may have to add a CMake SDL2 development package directory using `-DSDL2_DIR=...` .  See https://trenki2.github.io/blog/2017/06/02/using-sdl2-with-cmake/ for more information.
+
+
 
 ```bash
 git clone --recurse-submodules  https://github.com/bradgrantham/rosa-emu
@@ -12,7 +22,22 @@ cmake -Bbuild . # optionally build type etc, e.g. -DCMAKE_BUILD_TYPE=Debug
 ./rosa-emu
 ```
 
+
+
 Rosa apps run in `rosa-emu` in the current working directory by default.  That's where apps will look for files, ROM and floppy images, etc.  You can specify another directory as the current directory using `--root-dir`.
+
+Run the emulator from the build directory provided to `cmake`, e.g.`./build/rosa-emu` By default no files are provided for the existing apps.  To demonstrate the MP3 player, for example, create a new root directory, e.g. `emu-root`, then put some MP3 files in it, then run the emulator using that directory.
+
+```C++
+./build/rosa-emu --root-dir emu-root
+```
+
+### Emulator Limitations
+
+* Color video modes are emulated as if the display is a black-and-white TV
+* It is possible to allocate far more memory in the emulator than is available on the Rocinante hardware.
+
+
 
 ## Adding an application - Quick Start
 
@@ -86,6 +111,8 @@ Finally, add launching code for your app to a new case statement in `launcher.cp
             }	
 ```
 
+
+
 ## Write programs more or less like POSIX C++ apps
 
 Can use C++, including: static initializers, chrono
@@ -96,21 +123,35 @@ Cannot use: fprintf("%lld"); most stdlib like exit, fork, exec, link, unlink, wa
 
 Not sure about: C++ locking
 
+
+
 ## System functionality
 
 Call `RoDoHousekeeping()` frequently, more than 10 times a second.  It's okay to run it after every `RoPollEvent()` call.
 
+
+
+## Timing
+
+Rosa apps can use C++ `std::chrono` as well as `gettimeofday`.  Rosa's API includes a pair of convenience functions: `RoDelayMillis()` blocks for a specified number of milliseconds, and `RoGetMillis()` returns the number of milliseconds since system startup.  (The number of millis since startup will wrap around and need special handling if the system runs for more than 49 days.)
+
+
+
 ## Video
 
-Video modes in Rosa are implemented as functions that fill NTSC sample buffers.  Rosa's kernel wraps the sample buffers with sync and blank and optional colorburst signals to provide an NTSC video signal.  `RoTextMode()` initializes a low-res text mode The existing `apple2e` and `coleco` apps demonstrate custom video modes. 
+Video modes in Rosa are implemented as functions that fill NTSC sample buffers.  Rosa's kernel wraps the sample buffers with sync and blank and optional colorburst signals to provide an NTSC video signal.  Currently 64KB are reserved for video memory.  See the use of `RoNTSCSetMode()`by `RoTextMode()` in`text-mode.cpp` for a low-res text mode and the existing `apple2e` and `coleco` apps for custom video modes.
+
+
 
 ## Audio
 
 Call `RoAudioGetSamplingInfo() `to get the audio sampling rate and the number of bytes of stereo unsigned 8-bit samples that are preferred in a single audio buffer update.  That is to say, each audio sample is left then right audio samples in one byte each, from 0 to 255.
 
+
+
 ## Events (keyboard, mouse, joystick)
 
-Query keyboard events with `RoEventPoll`().
+Query keyboard events with `RoEventPoll()`.
 
 Keyboard events are key press and release values including modifier keys.  The existing `apple2e` and `coleco` apps demonstrate how to combine modifier keys and pressed to provide application-specific keyboard data.
 
