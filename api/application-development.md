@@ -1,18 +1,18 @@
 [TOC]
 
-
-
 # Rocinante ("Rosa" for short) Programming Guide
 
 
 
 ## The Rosa Emulator
 
-Building `rosa-emu` requires SDL2 development libraries.
+The Rosa Emulator, `rosa-emu`, allows rapid application development in desktop environments.
 
-On Windows one may have to add a CMake SDL2 development package directory using `-DSDL2_DIR=...` .  See https://trenki2.github.io/blog/2017/06/02/using-sdl2-with-cmake/ for more information.
+Build Requirements
 
+Building `rosa-emu` requires SDL2 development libraries with CMake configuration to find the SDL libraries and headers.  For MacOS, MacPorts and Homebrew provide an `sdl2` package.  For Debian-derived Linux distributions, try `libsdl2-dev`.  On Windows one may have to download a CMake SDL2 development package, create a  directory using `-DSDL2_DIR=...` .  See https://trenki2.github.io/blog/2017/06/02/using-sdl2-with-cmake/ for more information.
 
+### Example commands for cloning, configuring, and building `rosa-emu`:
 
 ```bash
 git clone --recurse-submodules  https://github.com/bradgrantham/rosa-emu
@@ -32,9 +32,17 @@ Run the emulator from the build directory provided to `cmake`, e.g.`./build/rosa
 ./build/rosa-emu --root-dir emu-root
 ```
 
+
+
 ### Emulator Limitations
 
-* Color video modes are emulated as if the display is a black-and-white TV
+* Color video modes are emulated as if the display is a black-and-white TV.
+* `RoNTSCWaitFrame()` is not yet implemented
+* Joystick and keypad is not yet implemented.
+* The emulator doesn't produce a HiDPI-aware window; it could be prettier.
+* The three "console" buttons are not yet implemented.
+* `RoDebugOverlayPrintf()` sends the formatted string to `stdout`.  `RoDebugOverlaySetLine()` is not implemented.
+* Output to serial console is implemented using `stdout`.  Input from serial console is not implemented
 * It is possible to allocate far more memory in the emulator than is available on the Rocinante hardware.
 
 
@@ -127,13 +135,13 @@ Not sure about: C++ locking
 
 ## System functionality
 
-Call `RoDoHousekeeping()` frequently, more than 10 times a second.  It's okay to run it after every `RoPollEvent()` call.
+Call `RoDoHousekeeping()` frequently, like 100 times a second.  Housekeeping includes USB polling, updating the system LEDs, and anything else that should happen frequently but can't be performed from a separate interrupt handler on the hardware or a thread in the emulator.
 
 
 
 ## Timing
 
-Rosa apps can use C++ `std::chrono` as well as `gettimeofday`.  Rosa's API includes a pair of convenience functions: `RoDelayMillis()` blocks for a specified number of milliseconds, and `RoGetMillis()` returns the number of milliseconds since system startup.  (The number of millis since startup will wrap around and need special handling if the system runs for more than 49 days.)
+Rosa apps can use C++ `std::chrono` as well as `gettimeofday`.  Rosa's API includes a pair of limited convenience functions for timing: `RoDelayMillis()` blocks for a specified number of milliseconds, and `RoGetMillis()` returns the number of milliseconds since system startup.  (The number of millis since startup will wrap around and need special handling if the system runs for more than 49 days.)
 
 
 
@@ -141,29 +149,39 @@ Rosa apps can use C++ `std::chrono` as well as `gettimeofday`.  Rosa's API inclu
 
 Video modes in Rosa are implemented as functions that fill NTSC sample buffers.  Rosa's kernel wraps the sample buffers with sync and blank and optional colorburst signals to provide an NTSC video signal.  Currently 64KB are reserved for video memory.  See the use of `RoNTSCSetMode()`by `RoTextMode()` in`text-mode.cpp` for a low-res text mode and the existing `apple2e` and `coleco` apps for custom video modes.
 
+Currently the row buffer functions are hardcoded to request 704 samples per line; 4 samples per wavelength of the color burst.  This allows full expression of NTSC color by outputting a waveform that analog equipment recognizes as a color signal.  (Most 8-bit consoles and computers in the late 1970's and early 1980's generated color for TV using a similar digital form.).
+
+Some equpiment, notably any based on the TMS9918 series, used a clock frequency 6x the colorburst frequency.  A later revision of Rosa may extend the video mode API to include a selectable frequency multiplier for the colorburst frequency but this will be provided with a new entrypoint.
+
+For grayscale video, provide a colorburst function that returns 0.
+
+For color, provide a colorburst function that returns 1.  Convenience functions are provided to convert YIQ or RGB colors to an `ntsc_wave_t`, a 32-bit value that has 8-bit NTSC samples packed in LSB memory layout.  Byte N of an `ntsc_wave_t` corresponds to `sample % 4` in the output buffer.  That is to say, given an `ntsc-wave_t wave`, `wave & 0xFF` would be used for samples 0, 4, 8, etc; `(wave >> 8) & 0xFF` would be used for samples 1, 5, 9, etc. A video mode implementation is expected to generate `ntsc_wave_t` values infrequently; for example when palette entries are changed.
+
 
 
 ## Audio
 
-Call `RoAudioGetSamplingInfo() `to get the audio sampling rate and the number of bytes of stereo unsigned 8-bit samples that are preferred in a single audio buffer update.  That is to say, each audio sample is left then right audio samples in one byte each, from 0 to 255.
+Call `RoAudioGetSamplingInfo() `to get the audio sampling rate and the number of bytes of stereo unsigned 8-bit samples that are preferred in a single audio buffer update.  That is to say, each audio sample is left then right values, one byte each, from 0 to 255.
 
 
 
 ## Events (keyboard, mouse, joystick)
 
-Query keyboard events with `RoEventPoll()`.
+Query keyboard, mouse, and console button events with `RoEventPoll()`.  The `RoEvent` structure contains a `union` of all implemented event types and an `eventType` field to indicate which is valid.
 
 Keyboard events are key press and release values including modifier keys.  The existing `apple2e` and `coleco` apps demonstrate how to combine modifier keys and pressed to provide application-specific keyboard data.
 
 Rosa provides convenience functions for a single key repeat.  Create a `RoKeyRepeatManager`.  After calling `RoEventPoll()`, chain its results through `RoKeyRepeatUpdate()`, which will created a repeating key press if the repeat delay has been exceeded.  The `apple2e` and `coleco` apps demonstrate the use of `RoKeyRepeatManager`.
 
+Mouse motion is represented as X and Y deltas.  Mouse button presses and releases are represented by press or release events with a button number.
+
 Query joystick values using `RoGetJoystickState` using either `CONTROLLER_1` or `CONTROLLER_2`.  The result is zero or more of the active direction and fire button values or'd together:
 
-- CONTROLLER_FIRE_BIT
-- CONTROLLER_NORTH_BIT
-- CONTROLLER_EAST_BIT
-- CONTROLLER_SOUTH_BIT
-- CONTROLLER_WEST_BIT
+- `CONTROLLER_FIRE_BIT`
+- `CONTROLLER_NORTH_BIT`
+- `CONTROLLER_EAST_BIT`
+- `CONTROLLER_SOUTH_BIT`
+- `CONTROLLER_WEST_BIT`
 
 Query keypad values if desired (and when a Colecovision keypad is attached) using `RoGetKeypadState` using either `CONTROLLER_1` or `CONTROLLER_2`.  The result is one of the `CONTROLLER_KEYPAD` values: `0`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `9`, `asterisk`, or `pound`.
 
@@ -178,12 +196,18 @@ Query keypad values if desired (and when a Colecovision keypad is attached) usin
 ## System API: `rocinante.h`
 
 `typedef enum Status`
-* `RO_FAILURE(status)`
-* `RO_USER_DECLINED`
-* `RO_SIZE_EXCEEDED`
-* `RO_RESOURCE_NOT_FOUND`
-* `RO_RESOURCE_EXHAUSTED`
-* `RO_INVALID_PARAMETER_VALUE`
+* `RO_FAILURE(status)` - `true` if the status was a failure
+
+Not failure status codes:
+
+* `RO_USER_DECLINED` - User canceled a UI prompt.  Not a failure status code.
+
+Failure status codes:
+
+* `RO_SIZE_EXCEEDED` - Size of passed buffer was insufficient.
+* `RO_RESOURCE_NOT_FOUND` - Could not find requested resource by index or by name.
+* `RO_RESOURCE_EXHAUSTED` - Could not allocate another object of the requested type.
+* `RO_INVALID_PARAMETER_VALUE` - One parameter was not a valid value.
 
 ### Debug Overlay
 `void RoDebugOverlayPrintf(const char *fmt, ...);`
@@ -192,7 +216,7 @@ Query keypad values if desired (and when a Colecovision keypad is attached) usin
 
 `void RoDebugOverlaySetLine(int line, const char *str, size_t size);`
 
-* Set a line in the debug overlay directly
+* Set a line in the debug overlay directly.
 
 ### Audio
 `void RoAudioGetSamplingInfo(float *rate, size_t *chunkSize);`
