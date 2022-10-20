@@ -946,7 +946,13 @@ void enqueue_audio_samples(uint8_t *buf, size_t count)
         RoAudioEnqueueSamplesBlocking(count * 2, lead_in);
         audio_needs_start = false;
     }
-    (void)RoAudioEnqueueSamplesBlocking(count * 2, buf);
+    static uint8_t stereo_buffer[2048];
+    assert(count < sizeof(stereo_buffer) / 2);
+    for(size_t i = 0; i < count; i ++) {
+        stereo_buffer[i * 2 + 0] = buf[i];
+        stereo_buffer[i * 2 + 1] = buf[i];
+    }
+    (void)RoAudioEnqueueSamplesBlocking(count * 2, stereo_buffer);
 }
 
 };
