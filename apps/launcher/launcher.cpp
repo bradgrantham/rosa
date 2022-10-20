@@ -46,8 +46,8 @@ int launcher_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
                 char fileChosen[512];
 
                 status = RoPromptUserToChooseFile("Choose a Coleco Cartridge", "coleco", CHOOSE_FILE_IGNORE_DOTFILES, NULL /* ".dsk" */, &fileChosenInDir);
-                sprintf(fileChosen, "coleco/%s", fileChosenInDir);
                 if(status == RO_SUCCESS) {
+                    sprintf(fileChosen, "coleco/%s", fileChosenInDir);
                     const char *args[] = {
                         "emulator",
                         "coleco/COLECO.ROM",
@@ -66,8 +66,8 @@ int launcher_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
                 char fileChosen[512];
 
                 status = RoPromptUserToChooseFile("Choose an Apple ][ boot disk", "floppies", CHOOSE_FILE_IGNORE_DOTFILES, NULL /* ".dsk" */, &fileChosenInDir);
-                sprintf(fileChosen, "floppies/%s", fileChosenInDir);
                 if(status == RO_SUCCESS) {
+                    sprintf(fileChosen, "floppies/%s", fileChosenInDir);
                     const char *args[] = {
                         "apple2e",
                         // "-fast",
