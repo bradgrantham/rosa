@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cctype>
 #include <cstring>
+#include <cassert>
 #include <deque>
 #include <string>
 #include <vector>
