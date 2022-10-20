@@ -175,7 +175,7 @@ Query keypad values if desired (and when a Colecovision keypad is attached) usin
 
 
 
-## System API: rocinante.h
+## System API: `rocinante.h`
 
 `typedef enum Status`
 * `RO_FAILURE(status)`
@@ -187,19 +187,35 @@ Query keypad values if desired (and when a Colecovision keypad is attached) usin
 
 ### Debug Overlay
 `void RoDebugOverlayPrintf(const char *fmt, ...);`
+
+* Print a debugging statement to the Debug Video Overlay a la `printf`
+
 `void RoDebugOverlaySetLine(int line, const char *str, size_t size);`
+
+* Set a line in the debug overlay directly
 
 ### Audio
 `void RoAudioGetSamplingInfo(float *rate, size_t *chunkSize);`
+
+* Get the sampling rate and preferred byte count update
+
 `size_t RoAudioEnqueueSamplesBlocking(size_t writeSize /* in bytes */, uint8_t* buffer);`
+
+* Enqueue a buffer of U8 stereo samples
+* Starts audio if paused
+
 `void RoAudioClear();`
+
+* Clear and pause audio
 
 ### UI and File menu operations
 
 `enum RoFileChooserFlags`
 * `CHOOSE_FILE_NO_FLAGS = 0,`
 
-Status RoFillFilenameList(const char* dirName, uint32_t flags, const char* optionalFilterSuffix, size_t maxNames, char **filenames, size_t* filenamesSize);
+`Status RoFillFilenameList(const char* dirName, uint32_t flags, const char* optionalFilterSuffix, size_t maxNames, char **filenames, size_t* filenamesSize);`
+
+* Fill a list of files from a directory of the filesystem. _Primarily meant for internal use by `ui.h` functions (see below)_.
 
 ### Joystick, Paddle, Keypad
 
@@ -207,38 +223,87 @@ Status RoFillFilenameList(const char* dirName, uint32_t flags, const char* optio
 `RoControllerIndex` : `CONTROLLER_1`, `CONTROLLER_2`
 
 `uint8_t RoGetJoystickState(RoControllerIndex which);`
+
+* Read a bitmask of joystick state
+
 `uint8_t RoGetKeypadState(RoControllerIndex which);`
+
+* Read the current keypad button press
 
 ### Video
 
 #### Meant for use at initialization or rarely
 `INLINE unsigned char RoNTSCYIQToDAC(float y, float i, float q, float tcycles);`
+
+* Return the DAC sample value at a given location along the color waveform for a YIQ value.  Typically tcycles is 0.0, 0.25, 0.5, or 0.75 for 704 video samples.  (_Number of samples not guaranteed_)
+
 `INLINE unsigned char RoNTSCYIQDegreesToDAC(float y, float i, float q, int degrees);`
+
+* Return the DAC sample value at a given location along the color waveform for a YIQ value.  Degrees can vary 0 to 359.
+
 `INLINE ntsc_wave_t RoNTSCYIQToWave(float y, float i, float q);`
+
+* Return 4 NTSC samples packed into a 32-bit value for a YIQ color.
+
 `INLINE void RoRGBToYIQ(float r, float g, float b, float *y, float *i, float *q);`
+
+* Convert RGB to YIQ
+
 `INLINE void RoYIQToRGB(float y, float i, float q, float *r, float *g, float *b);`
+
+* Convert YIQ to RGB
+
 `INLINE ntsc_wave_t RoNTSCRGBToWave(float r, float g, float b);`
 
+* Return 4 NTSC samples packed into a 32-bit value for an RGB color.
+
 #### Video mode initialization
+
+A video mode switch may be requested by an application kit module (like the low-res text mode in `text-mode.h` requested by `RoTextMode()`) or by an application.
+
+`typedef int (*RoNTSCModeInitVideoMemoryFunc)(void* buffer, uint32_t bufferSize, uint8_t blackvalue, uint8_t whitevalue);`
+
+* Called by Rocinante kernel during a video mode switch requested by RoNTSCSetMode.  The requesting application or module should attempt to map its video resources into the provided `buffer`, not to exceed `bufferSize` bytes.  The minimum and maximum sample values are provided in `blackvalue` and `whitevalue`.
+
 `typedef void (*RoNTSCModeFillRowBufferFunc)(int frameIndex, int rowNumber, size_t maxSamples, uint8_t* rowBuffer);`
+
+* Called by Rocinante kernel for every scan line (so more than 15,000 times per second) to fill NTSC samples.  At the time of writing `maxSamples` is 704 but is not guaranteed not to change.
+* In interlaced mode, `rowNumber` ranges from 0 to 239, and in non-interlaced mode, `rowNumber` ranges from 0 to 479.
+
 `typedef int (*RoNTSCModeNeedsColorburstFunc)();`
-`void RoNTSCSetMode(int interlaced, RoNTSCModeFillRowBufferFunc fillBufferFunc, RoNTSCModeNeedsColorburstFunc needsColorBurstFunc, unsigned char *blackvalue, unsigned char *whitevalue);`
+
+* Called by Rocinante kernel every frame to determine if scanlines require the colorburst signal.  If colorburst is not provided, a TV or video monitor will typically provide higher resolution and will display only gray pixels.
+
+`void RoNTSCSetMode(int interlaced, RoNTSCModeInitVideoMemoryFunc initFunc, RoNTSCModeFillRowBufferFunc fillBufferFunc, RoNTSCModeNeedsColorburstFunc needsColorBurstFunc);`
+
+* Request a video mode change
 
 #### Synchronization to Vertical Retrace
 `extern void RoNTSCWaitFrame(void);`
+
+* Block until the beginning of the next frame
 
 ### Housekeeping, need to call > 10 times per second
 
 `int RoDoHousekeeping(void);`
 
+* Perform housekeeping, e.g. polling USB.  This is safe to call up to 100 times per second.  Calling not frequently enough may lose USB events and calling too frequently will introduce high overhead.
+
 ### In emergency and nothing else to be done
 
 `void RoPanic(void);`
 
+* Flash the system LED and loop forever.  Maybe print something first.
+
 ### Timing Convenience
 
 `void RoDelayMillis(uint32_t millis);`
+
+* Block execution for `millis` milliseconds.
+
 `uint32_t RoGetMillis();`
+
+* Get milliseconds since system startup.
 
 ## Events API: `events.h`
 
@@ -246,37 +311,108 @@ Status RoFillFilenameList(const char* dirName, uint32_t flags, const char* optio
 
 `int RoEventPoll(RoEvent *event); /* 0 if none, 1 if filled */`
 
+* Poll for events
+
 ### Keyboard and mouse events
 
-`enum RoKeyCap`
 `MouseMoveEvent`
+
+* Contains a mouse event with X and Y delta in `x` and `y`
+
 `ButtonPressEvent`
+
+* Contains a mouse button press or console button press event with button number in `button`.  If a console button was pressed (`CONSOLE_BUTTONPRESS`) then there will be no release event.
+
 `ButtonReleaseEvent`
+
+* Contains a mouse button releast event with button number in `button`
+
 `KeyboardRawEvent`
+
+* Cotnains a keyboard raw press or release event in `key`. If the key was pressed, `isPress` will be `1`, otherwise will be `0`
+
 `RoEvent`
+
+* An event, storing the type in `eventType` ; `MOUSE_MOVE`, `MOUSE_BUTTONPRESS`, `MOUSE_BUTTONRELEASE`, `KEYBOARD_RAW`, `CONSOLE_BUTTONPRESS`, or `EVENTS_LOST` in the event that the system queue overflowed since the last `RoEventPoll` call and events were lost.
+
+`enum RoKeyCap`
+
+* Enumerates the keyboard keys available on Rosa - see `events.h` for the list.
 
 ### Key repeat manager
 
-`RoKeyRepeatManager`
+`struct RoKeyRepeatManager`
+
+* Class encapsulating key repeat state
+
+`void RoKeyRepeatInit(RoKeyRepeatManager *mgr);`
+
+* Initialize an instance of `RoKeyRepeatManager`
 
 `void RoKeyRepeatRelease(RoKeyRepeatManager *mgr, int released);`
+
+* internal use
+
 `void RoKeyRepeatPress(RoKeyRepeatManager *mgr, int pressed);`
+
+* internal use
+
 `int RoKeyRepeatUpdate(RoKeyRepeatManager *mgr, int haveEvent, RoEvent* ev);`
+
+* Call with an initialized `RoKeyRepeatManager` and the result of `RoEventPoll` in `haveEvent` and the `RoEvent` pass into `RoEventPoll` in `ev`.  If `RoEventPoll` didn't return an event, this function tracks a timer for the last press of a key without a release, and will fill `ev` with a key press according to key repeat timing.
 
 ## Low-res Text mode: `text-mode.h`
 
 `void RoTextMode();`
+
+* Request the low-res text mode
+
 `void RoTextModeClearDisplay();`
+
+* Clear the low-res text characters and attributes.
+
 `void RoTextModeGetSize(int *w, int *h);`
-`TEXT_NO_ATTRIBUTES, TEXT_INVERSE`
+
+* Get the low-rest text area size width and height
+
+`TEXT_NO_ATTRIBUTES`
+
+* Character is displayed normally
+
+`TEXT_INVERSE`
+
+* Character is displayed inverted (black character in white rectangle)
+
 `void RoTextModeClearArea(int column, int w, int row, int h, uint8_t attributes);`
+
+* Clear an area of the text mode screen
+
 `void RoTextModeSetLine(int row, int column, uint8_t attributes, const char *string);`
+
+* Copy the provided string into the text mode screen with the provided attributes.
 
 ## UI elements: `ui.h`
 
 `Status RoPromptUserToChooseFromList(const char *title, const char* const* items, size_t itemCount, int *itemChosen);`
+
+* Display the provided list of items in the low-res text mode, allow the user to choose one (or cancel) and then return the chosen item index in `itemChosen`.
+
 `Status RoPromptUserToChooseFile(const char *title, const char *dirName, uint32_t flags, const char *optionalFilterSuffix, char** fileChosen);`
-`void RoShowListOfItems(const char *title, const char* const* items, size_t itemsSize, int whichAtTop, int whichSelected);`
+
+* Probe the list of files in the directory named `dirName`,  show the list of files in in the low-res text mode, allow the user to choose one (or cancel) and then return a pointer to the chosen filename in `fileChosen`.
+* Application must `free(*fileChosen)` when done with the filename.
+* Optional flags include `CHOOSE_FILE_IGNORE_DOTFILES` to not allow chosing a filename starting with `.`
+* Provide an optional filter suffix (e.g. `mp3`) to show only files with that suffix.
+
+``void RoShowListOfItems(const char *title, const char* const* items, size_t itemsSize, int whichAtTop, int whichSelected);`
+
+* Internal use - show a list of items in the text mode
+
 `void RoDisplayStringCentered(const char *message);`
+
+* Display a string centered in the low-res text mode.
+
 `void RoDisplayStringAndWaitForEnter(const char *message);`
+
+* Display a string centered in the low-res text mode and wait for the user to press enter
 
