@@ -1,14 +1,14 @@
-[TOC]
-
 # Rocinante ("Rosa" for short) Programming Guide
 
 
 
+[TOC]
+
 ## The Rosa Emulator
 
-The Rosa Emulator, `rosa-emu`, allows rapid application development in desktop environments.
+The Rosa Emulator, `rosa-emu`, allows rapid development in desktop environments of applications for the Rocinante hardware platform.
 
-Build Requirements
+### Build Requirements
 
 Building `rosa-emu` requires SDL2 development libraries with CMake configuration to find the SDL libraries and headers.  For MacOS, MacPorts and Homebrew provide an `sdl2` package.  For Debian-derived Linux distributions, try `libsdl2-dev`.  On Windows one may have to download a CMake SDL2 development package, create a  directory using `-DSDL2_DIR=...` .  See https://trenki2.github.io/blog/2017/06/02/using-sdl2-with-cmake/ for more information.
 
@@ -22,8 +22,6 @@ cmake -Bbuild . # optionally build type etc, e.g. -DCMAKE_BUILD_TYPE=Debug
 ./rosa-emu
 ```
 
-
-
 Rosa apps run in `rosa-emu` in the current working directory by default.  That's where apps will look for files, ROM and floppy images, etc.  You can specify another directory as the current directory using `--root-dir`.
 
 Run the emulator from the build directory provided to `cmake`, e.g.`./build/rosa-emu` By default no files are provided for the existing apps.  To demonstrate the MP3 player, for example, create a new root directory, e.g. `emu-root`, then put some MP3 files in it, then run the emulator using that directory.
@@ -34,15 +32,16 @@ Run the emulator from the build directory provided to `cmake`, e.g.`./build/rosa
 
 
 
-### Emulator Limitations
+### Current Emulator Limitations
 
+* `--root-dir` is emulated with `chdir`.  If applications open the directory `.` or files beginning with `./` or with no directory name, they will correctly open files in the specified `--root-dir`.  If applications open absolute paths, they will incorrectly open files in the emulator's host system.
 * Color video modes are emulated as if the display is a black-and-white TV.
 * `RoNTSCWaitFrame()` is not yet implemented
 * Joystick and keypad is not yet implemented.
 * The emulator doesn't produce a HiDPI-aware window; it could be prettier.
 * The three "console" buttons are not yet implemented.
 * `RoDebugOverlayPrintf()` sends the formatted string to `stdout`.  `RoDebugOverlaySetLine()` is not implemented.
-* Output to serial console is implemented using `stdout`.  Input from serial console is not implemented
+* Output to serial console is implemented using `stdout`.  Input from serial console is not implemented.
 * It is possible to allocate far more memory in the emulator than is available on the Rocinante hardware.
 
 
