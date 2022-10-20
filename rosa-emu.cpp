@@ -515,8 +515,9 @@ bool NTSCModeFuncsValid = false;
 RoNTSCModeFillRowBufferFunc NTSCModeFillRowBuffer;
 RoNTSCModeNeedsColorburstFunc NTSCModeNeedsColorburst;
 bool NTSCModeInterlaced = false;
+uint8_t VideoMemoryBuffer[65536];
 
-void RoNTSCSetMode(int interlaced_, RoNTSCModeFillRowBufferFunc fillBufferFunc_, RoNTSCModeNeedsColorburstFunc needsColorBurstFunc_, unsigned char *blackvalue, unsigned char *whitevalue)
+void RoNTSCSetMode(int interlaced_, RoNTSCModeInitVideoMemoryFunc initFunc, RoNTSCModeFillRowBufferFunc fillBufferFunc_, RoNTSCModeNeedsColorburstFunc needsColorBurstFunc_)
 {
     // XXX Need to lock here versus any threaded access to these variables
     NTSCModeFuncsValid = false;
@@ -525,13 +526,9 @@ void RoNTSCSetMode(int interlaced_, RoNTSCModeFillRowBufferFunc fillBufferFunc_,
     NTSCModeNeedsColorburst = needsColorBurstFunc_;
     NTSCModeInterlaced = interlaced_;
 
-    /* Should these be similar to HW values to exercise reduced precision? */
-    if(blackvalue != nullptr) {
-        *blackvalue = 0;
-    }
-    if(whitevalue != nullptr) {
-        *whitevalue = 255;
-    }
+    /* Should black and white be similar to HW values to exercise reduced precision? */
+    int result = initFunc(VideoMemoryBuffer, sizeof(VideoMemoryBuffer), 0, 255);
+    assert(result == 1);
 
     NTSCModeFuncsValid = true;
 }
