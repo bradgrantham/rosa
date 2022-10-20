@@ -39,14 +39,19 @@ void RoDisplayStringCentered(const char *message)
     RoTextMode();
     RoTextModeGetSize(&w, &h);
     RoTextModeClearDisplay();
-
     RoTextModeSetLine(h / 2, (w - strlen(message)) / 2, TEXT_NO_ATTRIBUTES, message);
 }
 
 void RoDisplayStringAndWaitForEnter(const char *message)
 {
+    int w, h;
     RoTextMode();
+    RoTextModeGetSize(&w, &h);
+    RoTextModeClearDisplay();
+    RoTextModeSetLine(h / 2, (w - strlen(message)) / 2, TEXT_NO_ATTRIBUTES, message);
     RoDisplayStringCentered(message);
+    static const char *enter = "(Press ENTER to Continue)";
+    RoTextModeSetLine(h / 2 + 1, (w - strlen(enter)) / 2, TEXT_NO_ATTRIBUTES, enter);
     int done = 0;
     while(!done) {
         RoEvent ev;
@@ -55,8 +60,10 @@ void RoDisplayStringAndWaitForEnter(const char *message)
         if(haveEvent) {
             switch(ev.eventType) {
                 case RoEvent::KEYBOARD_RAW: {
-                    // const struct KeyboardRawEvent raw = ev.u.keyboardRaw;
-                    done = 1;
+                    const struct KeyboardRawEvent raw = ev.u.keyboardRaw;
+                    if(raw.isPress && (raw.key == RoKeyCap::KEYCAP_ENTER)) {
+                        done = 1;
+                    }
                     break;
                 }
                 default:
