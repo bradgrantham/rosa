@@ -19,7 +19,7 @@ git clone --recurse-submodules  https://github.com/bradgrantham/rosa-emu
 cd rosa-emu
 cmake -Bbuild . # optionally build type etc, e.g. -DCMAKE_BUILD_TYPE=Debug
 (cd build ; make)
-./rosa-emu
+./build/rosa-emu
 ```
 
 Rosa apps run in `rosa-emu` in the current working directory by default.  That's where apps will look for files, ROM and floppy images, etc.  You can specify another directory as the current directory using `--root-dir`.
