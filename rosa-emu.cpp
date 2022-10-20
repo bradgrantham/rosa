@@ -32,6 +32,8 @@ void EnqueueStereoU8AudioSamples(uint8_t *buf, size_t sz)
     }
 
     if(actual_audio_format == AUDIO_U8) {
+        uint32_t queued;
+        while((queued = SDL_GetQueuedAudioSize(audio_device)) > 1024 * 2);
         SDL_QueueAudio(audio_device, buf, static_cast<uint32_t>(sz));
     }
 }
@@ -43,7 +45,7 @@ SDL_Surface *surface;
 
 const static int SCREEN_X = 704;
 const static int SCREEN_Y = 480;
-const static int SCREEN_SCALE = 2;
+const static int SCREEN_SCALE = 1;
 
 void Start(uint32_t& stereoU8SampleRate, size_t& preferredAudioBufferSizeBytes)
 {
@@ -570,7 +572,7 @@ int RoDoHousekeeping(void)
     if(NTSCModeInterlaced) {
         for(int lineNumber = 0; lineNumber < 480; lineNumber++) {
             if(NTSCModeFuncsValid) {
-                memset(samples + lineNumber * 704, 128, 704);
+                memset(samples + lineNumber * 704, 0, 704);
                 NTSCModeFillRowBuffer(0, lineNumber, 704, samples + lineNumber * 704);
                 if(needsColorburst) {
                     // blur for now
@@ -587,7 +589,7 @@ int RoDoHousekeeping(void)
     } else {
         for(int lineNumber = 0; lineNumber < 240; lineNumber++) {
             if(NTSCModeFuncsValid) {
-                memset(samples + (lineNumber * 2 + 0) * 704, 128, 704);
+                memset(samples + (lineNumber * 2 + 0) * 704, 0, 704);
                 NTSCModeFillRowBuffer(0, lineNumber, 704, samples + (lineNumber * 2 + 0) * 704);
                 if(needsColorburst) {
                     // blur for now
