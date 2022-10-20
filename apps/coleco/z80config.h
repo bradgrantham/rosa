@@ -79,4 +79,9 @@
 
 /* #define Z80_MASK_IM2_VECTOR_ADDRESS */
 
+#define Z80Reset CVZ80Reset
+#define Z80Interrupt CVZ80Interrupt
+#define Z80NonMaskableInterrupt CVZ80NonMaskableInterrupt
+#define Z80Emulate CVZ80Emulate
+
 #endif
