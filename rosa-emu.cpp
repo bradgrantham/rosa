@@ -560,53 +560,65 @@ uint32_t RoGetMillis()
 
 int RoDoHousekeeping(void)
 {
-    HandleEvents();
-    if(quit_requested) {
-        SDL_Quit();
-        exit(0);
+    static std::chrono::time_point<std::chrono::system_clock> last_event_handling = std::chrono::system_clock::now();
+    static std::chrono::time_point<std::chrono::system_clock> last_frame_processing = std::chrono::system_clock::now();
+
+    std::chrono::time_point<std::chrono::system_clock> now = std::chrono::system_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_event_handling).count();
+    if(elapsed > 20) {
+        last_event_handling = now;
+        HandleEvents();
+        if(quit_requested) {
+            SDL_Quit();
+            exit(0);
+        }
     }
 
     bool needsColorburst = NTSCModeNeedsColorburst();
 
-    // XXX if time has sufficiently elapsed
-    if(NTSCModeInterlaced) {
-        for(int lineNumber = 0; lineNumber < 480; lineNumber++) {
-            if(NTSCModeFuncsValid) {
-                memset(samples + lineNumber * 704, 0, 704);
-                NTSCModeFillRowBuffer(0, lineNumber, 704, samples + lineNumber * 704);
-                if(needsColorburst) {
-                    // blur for now
-                    for(int x = 0; x < 704 - 3; x++) {
-                        samples[lineNumber * 704 + x + 0] =
-                            samples[lineNumber * 704 + x + 0] * .2 +
-                            samples[lineNumber * 704 + x + 1] * .3 + 
-                            samples[lineNumber * 704 + x + 2] * .3 +
-                            samples[lineNumber * 704 + x + 3] * .2;
+    now = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_frame_processing).count();
+    if(elapsed > 15) {
+        last_frame_processing = now;
+        if(NTSCModeInterlaced) {
+            for(int lineNumber = 0; lineNumber < 480; lineNumber++) {
+                if(NTSCModeFuncsValid) {
+                    memset(samples + lineNumber * 704, 0, 704);
+                    NTSCModeFillRowBuffer(0, lineNumber, 704, samples + lineNumber * 704);
+                    if(needsColorburst) {
+                        // blur for now
+                        for(int x = 0; x < 704 - 3; x++) {
+                            samples[lineNumber * 704 + x + 0] =
+                                samples[lineNumber * 704 + x + 0] * .2 +
+                                samples[lineNumber * 704 + x + 1] * .3 + 
+                                samples[lineNumber * 704 + x + 2] * .3 +
+                                samples[lineNumber * 704 + x + 3] * .2;
+                        }
                     }
                 }
             }
-        }
-    } else {
-        for(int lineNumber = 0; lineNumber < 240; lineNumber++) {
-            if(NTSCModeFuncsValid) {
-                memset(samples + (lineNumber * 2 + 0) * 704, 0, 704);
-                NTSCModeFillRowBuffer(0, lineNumber, 704, samples + (lineNumber * 2 + 0) * 704);
-                if(needsColorburst) {
-                    // blur for now
-                    for(int x = 0; x < 704 - 3; x++) {
-                        samples[(lineNumber * 2 + 0) * 704 + x + 0] =
-                            samples[(lineNumber * 2 + 0) * 704 + x + 0] * .2 +
-                            samples[(lineNumber * 2 + 0) * 704 + x + 1] * .3 + 
-                            samples[(lineNumber * 2 + 0) * 704 + x + 2] * .3 +
-                            samples[(lineNumber * 2 + 0) * 704 + x + 3] * .2;
+        } else {
+            for(int lineNumber = 0; lineNumber < 240; lineNumber++) {
+                if(NTSCModeFuncsValid) {
+                    memset(samples + (lineNumber * 2 + 0) * 704, 0, 704);
+                    NTSCModeFillRowBuffer(0, lineNumber, 704, samples + (lineNumber * 2 + 0) * 704);
+                    if(needsColorburst) {
+                        // blur for now
+                        for(int x = 0; x < 704 - 3; x++) {
+                            samples[(lineNumber * 2 + 0) * 704 + x + 0] =
+                                samples[(lineNumber * 2 + 0) * 704 + x + 0] * .2 +
+                                samples[(lineNumber * 2 + 0) * 704 + x + 1] * .3 + 
+                                samples[(lineNumber * 2 + 0) * 704 + x + 2] * .3 +
+                                samples[(lineNumber * 2 + 0) * 704 + x + 3] * .2;
+                        }
                     }
+                    memcpy(samples + (lineNumber * 2 + 1) * 704, samples + (lineNumber * 2 + 0) * 704, 704);
                 }
-                memcpy(samples + (lineNumber * 2 + 1) * 704, samples + (lineNumber * 2 + 0) * 704, 704);
             }
         }
-    }
 
-    Frame(samples);
+        Frame(samples);
+    }
 
     return 0;
 }
