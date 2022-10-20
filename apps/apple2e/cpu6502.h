@@ -63,6 +63,7 @@ struct CPU6502
 
     void save_write(uint16_t addr, uint8_t data)
     {
+        assert(pending_writes_count < 3);
         pending_writes_address[pending_writes_count] = addr;
         pending_writes_data[pending_writes_count] = data;
         pending_writes_count++;
