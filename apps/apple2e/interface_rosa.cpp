@@ -555,6 +555,7 @@ void start(bool, bool, bool, bool)
 {
     RoNTSCSetMode(0, WozModeInitVideoMemory, WozModeFillRowBuffer, WozModeNeedsColorburst);
     RoAudioGetSamplingInfo(&audioSampleRate, &audioChunkLengthBytes);
+    RoKeyRepeatInit(&keyRepeat);
     event_queue.push_back({KEYDOWN, CAPS_LOCK});
 }
 

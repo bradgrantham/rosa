@@ -213,8 +213,11 @@ void EnqueueStereoU8AudioSamples(uint8_t *buf, size_t sz)
 std::chrono::time_point<std::chrono::system_clock> previous_event_time;
 std::chrono::time_point<std::chrono::system_clock> start_of_frame;
 
+RoKeyRepeatManager keyRepeat;
+
 void Start(uint32_t& stereoU8SampleRate_, size_t& preferredAudioBufferSizeBytes_)
 {
+    RoKeyRepeatInit(&keyRepeat);
     for(int i = 0; i < 16; i++) {
         const uint8_t *c = TMS9918A::Colors[i];
         Pixmap256_192_4b_SetPaletteEntry(i, c[0], c[1], c[2]);
@@ -372,8 +375,6 @@ void ProcessKey(int press, int key)
         }
     }
 }
-
-RoKeyRepeatManager keyRepeat;
 
 void HandleEvents()
 {
