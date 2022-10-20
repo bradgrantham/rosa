@@ -526,8 +526,9 @@ event dequeue_event()
 
 tuple<float,bool> get_paddle(int num)
 {
-    if(num < 0 || num > 3)
+    if(num < 0 || num > 3) {
         return make_tuple(-1, false);
+    }
     return make_tuple(0, false);
 }
 
@@ -647,7 +648,6 @@ void ProcessKey(int press, int key)
 
         if(key == KEYCAP_LEFTGUI || key == KEYCAP_RIGHTGUI) {
 
-            printf("received press for GUI\n");
             super_down = true;
 
         } else {
@@ -821,7 +821,7 @@ void shutdown()
 }
 
 typedef pair<int, bool> address_auxpage;
-map<address_auxpage, uint8_t> writes;
+std::map<address_auxpage, uint8_t> writes;
 int collisions = 0;
 
 std::tuple<uint16_t, uint16_t> wozAddressToHGRBufferAddress(uint16_t wozAddress)
