@@ -1489,9 +1489,6 @@ struct MAINboard : board_base
         std::copy(rom_image + rom_C400.base - 0x8000, rom_image + rom_C400.base - 0x8000 + rom_C400.size, rom_C400.memory.begin());
         std::copy(rom_image + rom_C800.base - 0x8000, rom_image + rom_C800.base - 0x8000 + rom_C800.size, rom_C800.memory.begin());
 
-        printf("audio buffer samples %zd\n", actual_audio_buffer_size);
-        printf("audio rate %d\n", actual_sample_rate);
-
         repage_regions("init");
 
         for(int i = 0; i < 256; i++) {
@@ -2469,8 +2466,7 @@ int apple2_main(int argc, const char **argv)
                 }
             }
             clk_t prev_clock = clk;
-            uint32_t prevTick = RoGetMillis();
-            // RoDebugOverlaySetLine(0, "step");
+            clk_t prev_housekeeping_clock = clk;
             while(clk - prev_clock < clocks_per_slice) {
                 if(debug & DEBUG_DECODE) {
                     string dis = read_bus_and_disassemble(bus,
@@ -2494,11 +2490,9 @@ int apple2_main(int argc, const char **argv)
                     }
                 }
 #if defined(ROSA)
-                uint32_t nowTick = RoGetMillis();
-                // Setting this to + 16 made USB keyboard stop working.  
-                if(nowTick >= prevTick) {
+                if(clk - prev_housekeeping_clock > clocks_per_slice) {
                     RoDoHousekeeping();
-                    prevTick = nowTick;
+                    prev_housekeeping_clock = clk;
                 }
 #endif
                 if(debug & DEBUG_CLOCK) {
