@@ -8,14 +8,14 @@ extern "C" {
 //----------------------------------------------------------------------------
 // File chooser and UI routines
 
-Status RoPromptUserToChooseFromList(const char *title, const char* const* items, size_t itemCount, int *itemChosen);
+Status RoPromptUserToChooseFromList(const char *title, const char* const* items, size_t itemCount, int *itemChosen, int can_cancel);
 
 Status RoPromptUserToChooseFile(const char *title, const char *dirName, uint32_t flags, const char *optionalFilterSuffix, char** fileChosen);
 
 //----------------------------------------------------------------------------
 // Convenient text display functions
 
-void RoShowListOfItems(const char *title, const char* const* items, size_t itemsSize, int whichAtTop, int whichSelected);
+void RoShowListOfItems(const char *title, const char* const* items, size_t itemsSize, int whichAtTop, int whichSelected, int can_cancel);
 
 void RoDisplayStringCentered(const char *message);
 

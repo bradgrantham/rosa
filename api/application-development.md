@@ -416,9 +416,10 @@ A video mode switch may be requested by an application kit module (like the low-
 
 ## UI elements: `ui.h`
 
-`Status RoPromptUserToChooseFromList(const char *title, const char* const* items, size_t itemCount, int *itemChosen);`
+`Status RoPromptUserToChooseFromList(const char *title, const char* const* items, size_t itemCount, int *itemChosen, int can_cancel);`
 
 * Display the provided list of items in the low-res text mode, allow the user to choose one (or cancel) and then return the chosen item index in `itemChosen`.
+* Allow the user to exit by hitting "ESC" in which case the function returns `RO_USER_DECLINED`.
 
 `Status RoPromptUserToChooseFile(const char *title, const char *dirName, uint32_t flags, const char *optionalFilterSuffix, char** fileChosen);`
 
@@ -427,9 +428,9 @@ A video mode switch may be requested by an application kit module (like the low-
 * Optional flags include `CHOOSE_FILE_IGNORE_DOTFILES` to not allow chosing a filename starting with `.`
 * Provide an optional filter suffix (e.g. `mp3`) to show only files with that suffix.
 
-``void RoShowListOfItems(const char *title, const char* const* items, size_t itemsSize, int whichAtTop, int whichSelected);`
+``void RoShowListOfItems(const char *title, const char* const* items, size_t itemsSize, int whichAtTop, int whichSelected, int can_cancel);`
 
-* Internal use - show a list of items in the text mode
+* Internal use - show a list of items in the text mode, offer "ESC" as an option if `can_cancel` is true.
 
 `void RoDisplayStringCentered(const char *message);`
 

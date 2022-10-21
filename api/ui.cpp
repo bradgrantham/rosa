@@ -6,7 +6,7 @@
 #include "text-mode.h"
 #include "ui.h"
 
-void RoShowListOfItems(const char *title, const char* const* items, size_t itemsSize, int whichAtTop, int whichSelected)
+void RoShowListOfItems(const char *title, const char* const* items, size_t itemsSize, int whichAtTop, int whichSelected, int can_cancel)
 {
     int w, h;
     RoTextMode();
@@ -28,7 +28,7 @@ void RoShowListOfItems(const char *title, const char* const* items, size_t items
         }
     }
 
-    static const char* prompt = "ESC - Cancel, ENTER - Choose";
+    const char* prompt = can_cancel ? "ESC - Cancel, ENTER - Choose" : "ENTER - Choose";
     int promptIndent = (w - strlen(prompt)) / 2;
     RoTextModeSetLine(h - 1, promptIndent, TEXT_NO_ATTRIBUTES, prompt);
 }
@@ -75,7 +75,7 @@ void RoDisplayStringAndWaitForEnter(const char *message)
     }
 }
 
-Status RoPromptUserToChooseFromList(const char *title, const char* const* items, size_t itemCount, int *itemChosen)
+Status RoPromptUserToChooseFromList(const char *title, const char* const* items, size_t itemCount, int *itemChosen, int can_cancel)
 {
     int whichItemAtTop = 0;
     int whichItemSelected = 0;
@@ -97,7 +97,7 @@ Status RoPromptUserToChooseFromList(const char *title, const char* const* items,
         int selectCurrentLine = 0;
 
         if(redraw) {
-            RoShowListOfItems(title, items, itemCount, whichItemAtTop, whichItemSelected);
+            RoShowListOfItems(title, items, itemCount, whichItemAtTop, whichItemSelected, can_cancel);
             redraw = 0;
         }
 
@@ -135,7 +135,7 @@ Status RoPromptUserToChooseFromList(const char *title, const char* const* items,
 
                     if(raw.isPress) {
 
-                        if(raw.key == KEYCAP_ESCAPE) {
+                        if(can_cancel && (raw.key == KEYCAP_ESCAPE)) {
 
                             *itemChosen = -1;
                             status = RO_USER_DECLINED;
@@ -218,9 +218,13 @@ Status RoPromptUserToChooseFile(const char *title, const char *dirName, uint32_t
         RoDisplayStringAndWaitForEnter("Filename chooser failure!");
         return RO_RESOURCE_NOT_FOUND;
     }
+    if(filenamesCount == 0) {
+        RoDisplayStringAndWaitForEnter("No .mp3 files found!");
+        return RO_RESOURCE_NOT_FOUND;
+    }
 
     int whichItemSelected;
-    result = RoPromptUserToChooseFromList(title, filenames, filenamesCount, &whichItemSelected);
+    result = RoPromptUserToChooseFromList(title, filenames, filenamesCount, &whichItemSelected, 1);
 
     if(result == RO_SUCCESS) {
         *fileChosen = _strdup(filenames[whichItemSelected]);
