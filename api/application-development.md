@@ -107,7 +107,7 @@ Add code to the `launcher.cpp` declaring your main, like `int my_app_main(int ar
         };
 ```
 
-Finally, add launching code for your app to a new case statement in `launcher.cpp`:
+Add launching code for your app to a new case statement in `launcher.cpp`:
 
 ```
             case 3: {
@@ -117,7 +117,7 @@ Finally, add launching code for your app to a new case statement in `launcher.cp
                 my_app_main(sizeof(args) / sizeof(args[0]), args);
             }	
 ```
-
+Finally, add your new app source to the CMakeLists.txt `add_executable` source list, run `cmake` again, and build `rosa-emu` again.
 
 
 ## Write programs more or less like POSIX C++ apps
