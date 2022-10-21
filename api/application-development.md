@@ -40,7 +40,7 @@ Run the emulator from the build directory provided to `cmake`, e.g.`./build/rosa
 * Joystick and keypad is not yet implemented.
 * The emulator doesn't produce a HiDPI-aware window; it could be prettier.
 * The three "console" buttons are not yet implemented.
-* `RoDebugOverlayPrintf()` sends the formatted string to `stdout`.  `RoDebugOverlaySetLine()` is not implemented.
+* `RoDebugOverlayPrintf()` sends the formatted string to `stdout`.  `RoDebugOverlaySetLine()` sends the requested line to `stdout`.
 * Output to serial console is implemented using `stdout`.  Input from serial console is not implemented.
 * It is possible to allocate far more memory in the emulator than is available on the Rocinante hardware.
 
