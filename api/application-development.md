@@ -61,7 +61,7 @@ extern "C" {
 int my_app_main(int argc, char **argv);
 };
 
-int my_app_main(int argc, char **argv)
+int my_app_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
     bool quit = false;
 
