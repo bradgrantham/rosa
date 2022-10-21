@@ -14,7 +14,8 @@
 
 #include "rocinante.h"
 #include "events.h"
-// #include "hid.h"
+#include "text-mode.h"
+#include "ui.h"
 
 #define printf RoDebugOverlayPrintf
 
@@ -193,6 +194,10 @@ int main(int argc, char **argv)
         return 2;
     }
 
+    fseek(fp, 0, SEEK_END);
+    long file_length = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
     int rate;
 
 #if !defined(ROSA)
@@ -206,6 +211,8 @@ int main(int argc, char **argv)
     }
 
 #else /* defined(ROSA) */
+
+    RoTextMode();
 
     uint32_t prevTick;
     prevTick = RoGetMillis();
@@ -254,6 +261,8 @@ int main(int argc, char **argv)
 
 #endif
 
+    long so_far = 0;
+
     do {
         try_again = false;
         static size_t in_buffer = 0;
@@ -262,6 +271,7 @@ int main(int argc, char **argv)
         static short pcm[MINIMP3_MAX_SAMPLES_PER_FRAME];
         size_t result = fread(file_buffer + in_buffer, 1, sizeof(file_buffer) - in_buffer, fp);
         in_buffer += result;
+        so_far += result;
 
         // printf("read %zd bytes, now have %zd in buffer\n", result, in_buffer);
 
@@ -286,14 +296,16 @@ int main(int argc, char **argv)
 
 #if defined(ROSA)
 
+        static char progress[512];
+        sprintf(progress, "Decode Progress: %5.2f%%", so_far * 100.0 / file_length);
+        RoTextModeSetLine(0, 0, TEXT_NO_ATTRIBUTES, progress);
+
         uint32_t nowTick = RoGetMillis();
         // Setting this to + 16 made USB keyboard stop working.  
-        if(nowTick >= prevTick) {
+        if(nowTick >= prevTick + 10) {
             RoDoHousekeeping();
             prevTick = nowTick;
         }
-#endif
-
         RoEvent ev;
         int haveEvent = RoEventPoll(&ev);
 
@@ -318,6 +330,8 @@ int main(int argc, char **argv)
                     break;
             }
         }
+
+#endif
 
     } while(try_again);
 
