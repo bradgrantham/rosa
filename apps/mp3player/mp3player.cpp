@@ -213,6 +213,7 @@ int main(int argc, char **argv)
 #else /* defined(ROSA) */
 
     RoTextMode();
+    RoTextModeClearDisplay();
 
     uint32_t prevTick;
     prevTick = RoGetMillis();
@@ -297,7 +298,8 @@ int main(int argc, char **argv)
 #if defined(ROSA)
 
         static char progress[512];
-        sprintf(progress, "Decode Progress: %5.2f%%", so_far * 100.0 / file_length);
+        uint32_t tenthousandths = so_far / (file_length / 10000);
+        sprintf(progress, "Decode Progress: %2" PRIu32 ".%02" PRIu32 "%%", static_cast<uint32_t>(tenthousandths / 100), static_cast<uint32_t>(tenthousandths % 100));
         RoTextModeSetLine(0, 0, TEXT_NO_ATTRIBUTES, progress);
 
         uint32_t nowTick = RoGetMillis();
