@@ -15,7 +15,7 @@ int launcher_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
         RoTextMode();
         const char* applications[] = {"MP3 Player", "Colecovision Emulator", "Apple //e Emulator"};
         int whichApplication;
-        Status result = RoPromptUserToChooseFromList("Choose an application", applications, 3, &whichApplication);
+        Status result = RoPromptUserToChooseFromList("Choose an application", applications, 3, &whichApplication, 0);
 
         if(result != RO_SUCCESS) {
             continue;
