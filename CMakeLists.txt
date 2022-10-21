@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.12)
 
 project(rosa-emu)
 
-add_executable(rosa-emu rosa-emu.cpp events.cpp rosa-apps/apple2e/apple2e.cpp rosa-apps/apple2e/dis6502.cpp rosa-apps/apple2e/interface_rosa.cpp rosa-apps/coleco/coleco_platform_rosa.cpp rosa-apps/coleco/emulator.cpp rosa-apps/coleco/tms9918.cpp rosa-apps/launcher/launcher.cpp rosa-apps/mp3player/mp3player.cpp rosa-apps/coleco/z80emu.c rosa-kit/8x16.cpp rosa-kit/key-repeat.cpp rosa-kit/text-mode.cpp rosa-kit/ui.cpp)
+add_executable(rosa-emu rosa-emu.cpp events.cpp rosa-apps/apple2e/apple2e.cpp rosa-apps/apple2e/dis6502.cpp rosa-apps/apple2e/interface_rosa.cpp rosa-apps/coleco/coleco_platform_rosa.cpp rosa-apps/coleco/emulator.cpp rosa-apps/coleco/tms9918.cpp rosa-apps/launcher/launcher.cpp rosa-apps/mp3player/mp3player.cpp rosa-apps/coleco/z80emu.c rosa-apps/trs80/trs80.cpp rosa-apps/trs80/fonts.cpp rosa-kit/8x16.cpp rosa-kit/key-repeat.cpp rosa-kit/text-mode.cpp rosa-kit/ui.cpp)
 
 find_package(SDL2 REQUIRED)
 include_directories(${SDL2_INCLUDE_DIRS})
