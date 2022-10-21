@@ -396,14 +396,7 @@ void RoDebugOverlayPrintf(const char *fmt, ...)
 
 void RoDebugOverlaySetLine(int line, const char *str, size_t size)
 {
-    (void)line;
-    (void)str;
-    (void)size;
-    static bool once = false;
-    if(!once) {
-        printf("called unimplemented %s\n", __func__);
-        once = true;
-    }
+    printf("RoDebugOverlaySetLine: line %2d \"%*s\"\n", line, static_cast<int>(size), str);
 }
 
 void RoAudioGetSamplingInfo(float *rate, size_t *chunkSize)
