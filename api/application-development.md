@@ -34,7 +34,7 @@ Run the emulator from the build directory provided to `cmake`, e.g.`./build/rosa
 
 ### Current Emulator Limitations
 
-* `--root-dir` is emulated with `chdir`.  If applications open the directory `.` or files beginning with `./` or with no directory name, they will correctly open files in the specified `--root-dir`.  If applications open absolute paths, they will incorrectly open files in the emulator's host system.
+* `--root-dir` is emulated with `chdir`.  If applications open the directory `.` or files beginning with `./` or with no directory name, they will correctly open files in the specified `--root-dir`.  If applications open absolute paths, they will incorrectly open files in the emulator's host system at that path.
 * Color video modes are emulated as if the display is a black-and-white TV.
 * `RoNTSCWaitFrame()` is not yet implemented
 * Joystick and keypad is not yet implemented.
@@ -126,7 +126,7 @@ Can use C++, including: static initializers, chrono
 
 Can use C, including: posix; some stdlib like open, close, read, write, gettimeofday, sbrk, getpid (always 1), fstat, lseek
 
-Cannot use: fprintf("%lld"); most stdlib like exit, fork, exec, link, unlink, wait
+Cannot use: %lld and %f in printf, exit, fork, exec, link, unlink, wait
 
 Not sure about: C++ locking
 
@@ -195,11 +195,11 @@ Query keypad values if desired (and when a Colecovision keypad is attached) usin
 ## System API: `rocinante.h`
 
 `typedef enum Status`
-* `RO_FAILURE(status)` - `true` if the status was a failure
+* `RO_FAILURE(status)` - `true` if the status means the operation failed.
 
 Not failure status codes:
 
-* `RO_USER_DECLINED` - User canceled a UI prompt.  Not a failure status code.
+* `RO_USER_DECLINED` - User canceled a UI prompt.
 
 Failure status codes:
 
