@@ -22,8 +22,8 @@ static uint8_t NTSCBlack, NTSCWhite;
 
 void RoTextModeClearDisplay()
 {
-    memset(TextModeBuffer, ' ', TextModeWidth * TextModeWidth);
-    memset(TextModeAttributes, TEXT_NO_ATTRIBUTES, TextModeWidth * TextModeWidth);
+    memset(TextModeBuffer, ' ', TextModeWidth * TextModeHeight);
+    memset(TextModeAttributes, TEXT_NO_ATTRIBUTES, TextModeWidth * TextModeHeight);
 }
 
 int RoTextModeInitVideoMemory(void *videoMemory, uint32_t size, uint8_t black, uint8_t white)
