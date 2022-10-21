@@ -8,14 +8,15 @@ extern "C" {
 int apple2_main(int argc, const char **argv);
 int coleco_main(int argc, const char **argv);
 int mp3player_main(int argc, const char **argv);
+int trs80_main(int argc, const char **argv);
 
 int launcher_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
     while(1) {
         RoTextMode();
-        const char* applications[] = {"MP3 Player", "Colecovision Emulator", "Apple //e Emulator"};
+        const char* applications[] = {"MP3 Player", "Colecovision Emulator", "Apple //e Emulator", "TRS-80 Emulator"};
         int whichApplication;
-        Status result = RoPromptUserToChooseFromList("Choose an application", applications, 3, &whichApplication, 0);
+        Status result = RoPromptUserToChooseFromList("Choose an application", applications, 4, &whichApplication, 0);
 
         if(result != RO_SUCCESS) {
             continue;
@@ -80,6 +81,14 @@ int launcher_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
                     // declined or error
                 }
+                break;
+            }
+
+            case 3: {
+                const char *args[] = {
+                    "trs80",
+                };
+                trs80_main(sizeof(args) / sizeof(args[0]), args);
                 break;
             }
         }
