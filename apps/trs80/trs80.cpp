@@ -25,6 +25,8 @@ int trs80_main(int argc, char **argv);
 #define Trs80HorizontalMargin ((NTSCWidth - Trs80PixelWidth)/2)
 #define Trs80VerticalMargin ((NTSCHeight - Trs80PixelHeight)/2)
 
+#define Trs80BlinkPeriodMs 233
+
 static char *TextModeBuffer;
 
 static uint8_t NTSCBlack, NTSCWhite;
@@ -121,7 +123,7 @@ int trs80_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     Trs80TextModeSetLine(2, 0, "Radio Shack Model III Basic");
     Trs80TextModeSetLine(3, 0, "(c) '80 Tandy");
     Trs80TextModeSetLine(4, 0, "READY");
-    Trs80TextModeSetLine(5, 0, ">\xB0");
+    Trs80TextModeSetLine(5, 0, ">");
     for (int i = 0; i < 256; i++) {
         TextModeBuffer[1024 - 256 + i] = i;
     }
@@ -146,6 +148,11 @@ int trs80_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
             }
         }
         RoDoHousekeeping();
+
+        // Blink cursor.
+        uint32_t now = RoGetMillis();
+        uint32_t blink = (now / Trs80BlinkPeriodMs) % 2 == 0;
+        Trs80TextModeSetLine(5, 1, blink ? "\xB0" : "\x80");
     }
 
     return 0;
