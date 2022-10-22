@@ -10,22 +10,22 @@ int trs80_main(int argc, char **argv);
 //----------------------------------------------------------------------------
 // Text Mode
 
-#define Trs80ColumnCount 64
-#define Trs80RowCount 16
-#define Trs80CharWidth 8
-#define Trs80CharHeight 12
+constexpr int Trs80ColumnCount = 64;
+constexpr int Trs80RowCount = 16;
+constexpr int Trs80CharWidth = 8;
+constexpr int Trs80CharHeight = 12;
 
 // TODO check with Brad.
-#define NTSCWidth 704
-#define NTSCHeight 240
+constexpr int NTSCWidth = 704;
+constexpr int NTSCHeight = 240;
 
-#define Trs80PixelWidth (Trs80ColumnCount*Trs80CharWidth)
-#define Trs80PixelHeight (Trs80RowCount*Trs80CharHeight)
+constexpr int Trs80PixelWidth = (Trs80ColumnCount*Trs80CharWidth);
+constexpr int Trs80PixelHeight = (Trs80RowCount*Trs80CharHeight);
 
-#define Trs80HorizontalMargin ((NTSCWidth - Trs80PixelWidth)/2)
-#define Trs80VerticalMargin ((NTSCHeight - Trs80PixelHeight)/2)
+constexpr int Trs80HorizontalMargin = ((NTSCWidth - Trs80PixelWidth)/2);
+constexpr int Trs80VerticalMargin = ((NTSCHeight - Trs80PixelHeight)/2);
 
-#define Trs80BlinkPeriodMs 233
+constexpr int Trs80BlinkPeriodMs = 233;
 
 static char *TextModeBuffer;
 
