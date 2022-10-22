@@ -2,6 +2,7 @@
 #include <cstring>
 #include <chrono>
 #include <map>
+#include <deque>
 #include "rocinante.h"
 #include "events.h"
 #include "fonts.h"
@@ -18,6 +19,9 @@ int trs80_main(int argc, char **argv);
 };
 
 typedef long long clk_t;
+
+constexpr clk_t Trs80ClockHz = 2027520;
+constexpr clk_t Trs80TimerHz = 30;
 
 constexpr int Trs80ColumnCount = 64;
 constexpr int Trs80RowCount = 16;
@@ -49,6 +53,7 @@ constexpr int Trs80KeyboardBankSize = 0x100;
 constexpr int Trs80KeyboardBankCount = 4;
 constexpr int Trs80KeyboardBegin = 0x3800;
 constexpr int Trs80KeyboardEnd = Trs80KeyboardBegin + Trs80KeyboardBankSize*Trs80KeyboardBankCount;
+constexpr int Trs80KeyboardThrottleCycles = 50000;
 
 // Use these two for the byteIndex field of the KeyInfo:
 // Use the unshifted data when shifted.
@@ -74,6 +79,14 @@ struct KeyInfo {
     bool shiftPressed = false;
 };
 
+// Structure to record a raw key event for queuing.
+struct KeyEvent {
+    int key;
+    bool isPress;
+
+    KeyEvent(int key, bool isPress) : key(key), isPress(isPress) {}
+};
+
 // IRQs
 // constexpr uint8_t M1_TIMER_IRQ_MASK = 0x80;
 // constexpr uint8_t M3_CASSETTE_RISE_IRQ_MASK = 0x01;
@@ -92,6 +105,7 @@ constexpr uint8_t RESET_NMI_MASK = 0x20;
 
 // Holds the state of the physical machine.
 typedef struct Trs80Machine {
+    clk_t clock;
     Z80_STATE z80;
     uint8_t memory[MEMSIZE];
 
@@ -100,9 +114,12 @@ typedef struct Trs80Machine {
     ShiftState shiftForce;
     bool leftShiftPressed;
     bool rightShiftPressed;
-
+    clk_t keyProcessMinClock;
     // Map from Rosa's raw keycap to our key info structure.
-    std::map<int, KeyInfo> keymap;
+    std::map<int, KeyInfo> keyMap;
+    // We queue up key events so that we don't overwhelm the ROM polling
+    // routines.
+    std::deque<KeyEvent> keyQueue;
 
     // Which IRQs should be handled.
     uint8_t irqMask;
@@ -182,7 +199,7 @@ static int Trs80TextModeNeedsColorburst()
 // Generate the map from Rosa's keycap enum to the TRS-80's memory-mapped
 // keyboard bytes.
 static void initializeKeyboardMap(Trs80Machine *machine) {
-    auto &m = machine->keymap;
+    auto &m = machine->keyMap;
 
     m[KEYCAP_A] = { 0, 1 };
     m[KEYCAP_B] = { 0, 2 };
@@ -250,61 +267,21 @@ static void clearKeyboard(Trs80Machine *machine) {
     machine->shiftForce = ST_NEUTRAL;
     machine->leftShiftPressed = false;
     machine->rightShiftPressed = false;
+    machine->keyProcessMinClock = 0;
 }
 
-// Read a byte from the keyboard memory bank. This is an odd system where
-// bits in the address map to the various bytes, and you can read the OR'ed
-// addresses to read more than one byte at a time. For the last byte we fake
-// the Shift key if necessary.
-static uint8_t readKeyboard(Trs80Machine *machine, uint16_t addr) {
-    addr = (addr - Trs80KeyboardBegin) % Trs80KeyboardBankSize;
-    uint8_t b = 0;
-
-#if 0
-    // Dequeue if necessary.
-    if (clock > this.keyProcessMinClock) {
-        const keyWasPressed = this.processKeyQueue();
-        if (keyWasPressed) {
-            this.keyProcessMinClock = clock + KEY_DELAY_CLOCK_CYCLES;
-        }
-    }
-#endif
-
-    // There are 8 keyboard bytes, and the corresponding bit of the I/O/ read
-    // address tells you which of the 8 bytes are OR'ed into the result. Address 0
-    // is always 0x00, and address 255 is the OR of all 8 bytes. To check
-    // all the keys individually, you want to check address 1, 2, 4, 8, 16, etc.
-    for (int i = 0; i < 8; i++) {
-        if ((addr & (1 << i)) != 0) {
-            uint8_t keys = machine->keys[i];
-
-            if (i == 7) {
-                // Modify keys based on the shift force.
-                switch (machine->shiftForce) {
-                    case ST_NEUTRAL:
-                        // Nothing.
-                        break;
-
-                    case ST_FORCE_UP:
-                        // On the Model III the first two bits are left and right shift.
-                        keys &= ~0x03;
-                        break;
-
-                    case ST_FORCE_DOWN:
-                        keys |= 0x01;
-                        break;
-                }
-            }
-
-            b |= keys;
-        }
+// Process the next queued key event, if available. Returns whether a key was
+// dequeued.
+static bool processKeyQueue(Trs80Machine *machine) {
+    if (machine->keyQueue.empty()) {
+        return false;
     }
 
-    return b;
-}
+    KeyEvent const &keyEvent = machine->keyQueue.front();
+    machine->keyQueue.pop_front();
+    int key = keyEvent.key;
+    bool isPress = keyEvent.isPress;
 
-// Handle a keypress on the real machine, update memory-mapped I/O.
-static void handleKeypress(Trs80Machine *machine, int key, bool isPress) {
     // Remember shift state.
     if (key == KEYCAP_LEFTSHIFT) {
         machine->leftShiftPressed = isPress;
@@ -314,8 +291,8 @@ static void handleKeypress(Trs80Machine *machine, int key, bool isPress) {
     }
 
     // Find the info for this keycap.
-    auto itr = machine->keymap.find(key);
-    if (itr != machine->keymap.end()) {
+    auto itr = machine->keyMap.find(key);
+    if (itr != machine->keyMap.end()) {
         KeyInfo &keyInfo = itr->second;
 
         // Remember shifted state for the release, in case the user releases
@@ -351,6 +328,62 @@ static void handleKeypress(Trs80Machine *machine, int key, bool isPress) {
             }
         }
     }
+
+    return true;
+}
+
+// Read a byte from the keyboard memory bank. This is an odd system where
+// bits in the address map to the various bytes, and you can read the OR'ed
+// addresses to read more than one byte at a time. For the last byte we fake
+// the Shift key if necessary.
+static uint8_t readKeyboard(Trs80Machine *machine, uint16_t addr) {
+    addr = (addr - Trs80KeyboardBegin) % Trs80KeyboardBankSize;
+
+    // Dequeue if necessary.
+    if (machine->clock > machine->keyProcessMinClock) {
+        bool keyWasPressed = processKeyQueue(machine);
+        if (keyWasPressed) {
+            machine->keyProcessMinClock = machine->clock + Trs80KeyboardThrottleCycles;
+        }
+    }
+
+    // There are 8 keyboard bytes, and the corresponding bit of the I/O/ read
+    // address tells you which of the 8 bytes are OR'ed into the result. Address 0
+    // is always 0x00, and address 255 is the OR of all 8 bytes. To check
+    // all the keys individually, you want to check address 1, 2, 4, 8, 16, etc.
+    uint8_t b = 0;
+    for (int i = 0; i < 8; i++) {
+        if ((addr & (1 << i)) != 0) {
+            uint8_t keys = machine->keys[i];
+
+            if (i == 7) {
+                // Modify keys based on the shift force.
+                switch (machine->shiftForce) {
+                    case ST_NEUTRAL:
+                        // Nothing.
+                        break;
+
+                    case ST_FORCE_UP:
+                        // On the Model III the first two bits are left and right shift.
+                        keys &= ~0x03;
+                        break;
+
+                    case ST_FORCE_DOWN:
+                        keys |= 0x01;
+                        break;
+                }
+            }
+
+            b |= keys;
+        }
+    }
+
+    return b;
+}
+
+// Handle a keypress on the real machine, update memory-mapped I/O.
+static void handleKeypress(Trs80Machine *machine, int key, bool isPress) {
+    machine->keyQueue.emplace_back(key, isPress);
 }
 
 /**
@@ -405,6 +438,7 @@ static void handleTimer(Trs80Machine *machine) {
 }
 
 static void resetMachine(Trs80Machine *machine) {
+    machine->clock = 0;
     machine->modeImage = 0x80;
     setIrqMask(machine, 0);
     setNmiMask(machine, 0);
@@ -528,10 +562,7 @@ int trs80_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     initializeKeyboardMap(machine);
     resetMachine(machine);
 
-    clk_t tStateCount = 0;
     clk_t previousTimerClock = 0;
-    clk_t clockHz = 2027520;
-    clk_t timerHz = 30;
 
     auto emulationStartTime = std::chrono::system_clock::now();
 
@@ -539,9 +570,9 @@ int trs80_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
         clk_t cyclesToDo = 10000;
 
         // See if we should interrupt the emulator early for our timer interrupt.
-        clk_t nextTimerClock = previousTimerClock + clockHz / timerHz;
-        if (nextTimerClock >= tStateCount) {
-            clk_t clocksUntilTimer = nextTimerClock - tStateCount;
+        clk_t nextTimerClock = previousTimerClock + Trs80ClockHz / Trs80TimerHz;
+        if (nextTimerClock >= machine->clock) {
+            clk_t clocksUntilTimer = nextTimerClock - machine->clock;
             if (cyclesToDo > clocksUntilTimer) {
                 cyclesToDo = clocksUntilTimer;
             }
@@ -550,18 +581,18 @@ int trs80_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
         // See if we should slow down if we're going too fast.
         auto now = std::chrono::system_clock::now();
         auto microsSinceStart = std::chrono::duration_cast<std::chrono::microseconds>(now - emulationStartTime);
-        clk_t expectedClock = clockHz * microsSinceStart.count() / 1000000;
-        if (expectedClock < tStateCount) {
+        clk_t expectedClock = Trs80ClockHz * microsSinceStart.count() / 1000000;
+        if (expectedClock < machine->clock) {
             RoDoHousekeeping();
             continue;
         }
 
         // Emulate!
-        tStateCount += Z80Emulate(&machine->z80, cyclesToDo, machine);
+        machine->clock += Z80Emulate(&machine->z80, cyclesToDo, machine);
 
         // Handle non-maskable interrupts.
         if ((machine->nmiLatch & machine->nmiMask) != 0 && !machine->nmiSeen) {
-            tStateCount += Z80NonMaskableInterrupt(&machine->z80, machine);
+            machine->clock += Z80NonMaskableInterrupt(&machine->z80, machine);
             machine->nmiSeen = true;
 
             // Simulate the reset button being released.
@@ -570,13 +601,13 @@ int trs80_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 
         // Handle interrupts.
         if ((machine->irqLatch & machine->irqMask) != 0) {
-            tStateCount += Z80Interrupt(&machine->z80, 0, machine);
+            machine->clock += Z80Interrupt(&machine->z80, 0, machine);
         }
 
         // Set off a timer interrupt.
-        if (tStateCount > nextTimerClock) {
+        if (machine->clock > nextTimerClock) {
             handleTimer(machine);
-            previousTimerClock = tStateCount;
+            previousTimerClock = machine->clock;
         }
 
         // Check user input.
