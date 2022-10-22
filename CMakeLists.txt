@@ -2,12 +2,12 @@ cmake_minimum_required(VERSION 3.12)
 
 project(rosa-emu)
 
-add_executable(rosa-emu rosa-emu.cpp events.cpp rosa-apps/apple2e/apple2e.cpp rosa-apps/apple2e/dis6502.cpp rosa-apps/apple2e/interface_rosa.cpp rosa-apps/coleco/coleco_platform_rosa.cpp rosa-apps/coleco/emulator.cpp rosa-apps/coleco/tms9918.cpp rosa-apps/launcher/launcher.cpp rosa-apps/mp3player/mp3player.cpp rosa-apps/coleco/z80emu.c rosa-apps/trs80/trs80.cpp rosa-apps/trs80/fonts.cpp rosa-apps/trs80/z80emu.c rosa-kit/8x16.cpp rosa-kit/key-repeat.cpp rosa-kit/text-mode.cpp rosa-kit/ui.cpp)
+add_executable(rosa-emu rosa-emu.cpp events.cpp apps/apple2e/apple2e.cpp apps/apple2e/dis6502.cpp apps/apple2e/interface_rosa.cpp apps/coleco/coleco_platform_rosa.cpp apps/coleco/emulator.cpp apps/coleco/tms9918.cpp apps/launcher/launcher.cpp apps/mp3player/mp3player.cpp apps/coleco/z80emu.c apps/trs80/trs80.cpp apps/trs80/fonts.cpp apps/trs80/z80emu.c api/8x16.cpp api/key-repeat.cpp api/text-mode.cpp api/ui.cpp)
 
 find_package(SDL2 REQUIRED)
 include_directories(${SDL2_INCLUDE_DIRS})
 
-target_include_directories(rosa-emu PRIVATE rosa-kit)
+target_include_directories(rosa-emu PRIVATE api)
 
 target_link_libraries(rosa-emu ${SDL2_LIBRARIES})
 
