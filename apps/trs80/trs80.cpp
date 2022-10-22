@@ -8,6 +8,11 @@
 #include "z80user.h"
 #include "z80emu.h"
 
+/**
+ * Emulator for a TRS-80 Model III. Based on the TypeScript version available here:
+ * https://github.com/lkesteloot/trs80/tree/master/packages/trs80-emulator
+ */
+
 extern "C" {
 int trs80_main(int argc, char **argv);
 };
@@ -45,13 +50,29 @@ constexpr int Trs80KeyboardBankCount = 4;
 constexpr int Trs80KeyboardBegin = 0x3800;
 constexpr int Trs80KeyboardEnd = Trs80KeyboardBegin + Trs80KeyboardBankSize*Trs80KeyboardBankCount;
 
+// Use these two for the byteIndex field of the KeyInfo:
+// Use the unshifted data when shifted.
+constexpr int KEYBOARD_USE_UNSHIFTED = -1;
+// Ignore this key.
+constexpr int KEYBOARD_IGNORE = -2;
+
+// What we know about this keycap.
 struct KeyInfo {
+    // Static information about this keycap.
     int byteIndex;
     int bitNumber;
-    ShiftState shiftForce;
-};
+    ShiftState shiftForce = ST_NEUTRAL;
 
-static std::map<int, KeyInfo> Trs80KeyboardMap;
+    // If these are non-zero, use them when Shift key is pressed.
+    int shiftedByteIndex = KEYBOARD_USE_UNSHIFTED;
+    int shiftedBitNumber = KEYBOARD_USE_UNSHIFTED;
+    ShiftState shiftedShiftForce = ST_NEUTRAL;
+
+    // Dynamic information about whether the Shift key was pressed when
+    // the key was pressed. We use this when releasing the key to know
+    // how to map it to the right TRS-80 raw key.
+    bool shiftPressed = false;
+};
 
 // IRQs
 // constexpr uint8_t M1_TIMER_IRQ_MASK = 0x80;
@@ -77,6 +98,11 @@ typedef struct Trs80Machine {
     // 8 bytes, each a bitfield of keys currently pressed.
     uint8_t keys[8];
     ShiftState shiftForce;
+    bool leftShiftPressed;
+    bool rightShiftPressed;
+
+    // Map from Rosa's raw keycap to our key info structure.
+    std::map<int, KeyInfo> keymap;
 
     // Which IRQs should be handled.
     uint8_t irqMask;
@@ -88,19 +114,20 @@ typedef struct Trs80Machine {
     uint8_t nmiLatch;
     // Whether we've seen this NMI and handled it.
     int nmiSeen;
+    // Latch that mostly does nothing.
     uint8_t modeImage;
 } Trs80Machine;
 
+// Redundantly store video memory so that it's easily accessible from
+// the NTSC routines.
 static char *TextModeBuffer;
 
+// Record what values the system wants us to us for black and white.
 static uint8_t NTSCBlack, NTSCWhite;
 
-static void Trs80TextModeClearDisplay()
-{
-    memset(TextModeBuffer, ' ', Trs80ColumnCount * Trs80RowCount);
-}
-
-static int Trs80TextModeInitVideoMemory(void *videoMemory, uint32_t size, uint8_t black, uint8_t white)
+// Called by the system to initialize our video memory.
+static int Trs80TextModeInitVideoMemory(void *videoMemory, uint32_t size,
+        uint8_t black, uint8_t white)
 {
     auto reserve = [](void*& ptr, uint32_t& remaining, size_t rsv) {
         void *old = ptr;
@@ -120,11 +147,11 @@ static int Trs80TextModeInitVideoMemory(void *videoMemory, uint32_t size, uint8_
     }
     NTSCBlack = black;
     NTSCWhite = white;
-    Trs80TextModeClearDisplay();
 
     return 1;
 }
 
+// Called by the system to get the next row of video.
 __attribute__((hot,flatten)) void Trs80TextModeFillRowBuffer([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
     int rowWithinTextArea = rowNumber - Trs80VerticalMargin;
@@ -146,150 +173,83 @@ __attribute__((hot,flatten)) void Trs80TextModeFillRowBuffer([[maybe_unused]] in
     }
 }
 
+// Called by the system to know whether to generate the color burst signal.
 static int Trs80TextModeNeedsColorburst()
 {
     return 0;
 }
 
-static void initializeKeyboardMap() {
-    // Trs80KeyboardMap[KEYCAP_@] = { 0, 0, ST_FORCE_UP };
-    // Trs80KeyboardMap[KEYCAP_`] = { 0, 0, ST_FORCE_DOWN };
+// Generate the map from Rosa's keycap enum to the TRS-80's memory-mapped
+// keyboard bytes.
+static void initializeKeyboardMap(Trs80Machine *machine) {
+    auto &m = machine->keymap;
 
-    Trs80KeyboardMap[KEYCAP_A] = { 0, 1, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_B] = { 0, 2, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_C] = { 0, 3, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_D] = { 0, 4, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_E] = { 0, 5, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_F] = { 0, 6, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_G] = { 0, 7, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_H] = { 1, 0, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_I] = { 1, 1, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_J] = { 1, 2, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_K] = { 1, 3, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_L] = { 1, 4, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_M] = { 1, 5, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_N] = { 1, 6, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_O] = { 1, 7, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_P] = { 2, 0, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_Q] = { 2, 1, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_R] = { 2, 2, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_S] = { 2, 3, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_T] = { 2, 4, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_U] = { 2, 5, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_V] = { 2, 6, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_W] = { 2, 7, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_X] = { 3, 0, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_Y] = { 3, 1, ST_FORCE_DOWN };
-    Trs80KeyboardMap[KEYCAP_Z] = { 3, 2, ST_FORCE_DOWN };
+    m[KEYCAP_A] = { 0, 1 };
+    m[KEYCAP_B] = { 0, 2 };
+    m[KEYCAP_C] = { 0, 3 };
+    m[KEYCAP_D] = { 0, 4 };
+    m[KEYCAP_E] = { 0, 5 };
+    m[KEYCAP_F] = { 0, 6 };
+    m[KEYCAP_G] = { 0, 7 };
+    m[KEYCAP_H] = { 1, 0 };
+    m[KEYCAP_I] = { 1, 1 };
+    m[KEYCAP_J] = { 1, 2 };
+    m[KEYCAP_K] = { 1, 3 };
+    m[KEYCAP_L] = { 1, 4 };
+    m[KEYCAP_M] = { 1, 5 };
+    m[KEYCAP_N] = { 1, 6 };
+    m[KEYCAP_O] = { 1, 7 };
+    m[KEYCAP_P] = { 2, 0 };
+    m[KEYCAP_Q] = { 2, 1 };
+    m[KEYCAP_R] = { 2, 2 };
+    m[KEYCAP_S] = { 2, 3 };
+    m[KEYCAP_T] = { 2, 4 };
+    m[KEYCAP_U] = { 2, 5 };
+    m[KEYCAP_V] = { 2, 6 };
+    m[KEYCAP_W] = { 2, 7 };
+    m[KEYCAP_X] = { 3, 0 };
+    m[KEYCAP_Y] = { 3, 1 };
+    m[KEYCAP_Z] = { 3, 2 };
 
-#if 0
-    Trs80KeyboardMap[KEYCAP_a] = { 0, 1, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_b] = { 0, 2, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_c] = { 0, 3, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_d] = { 0, 4, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_e] = { 0, 5, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_f] = { 0, 6, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_g] = { 0, 7, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_h] = { 1, 0, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_i] = { 1, 1, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_j] = { 1, 2, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_k] = { 1, 3, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_l] = { 1, 4, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_m] = { 1, 5, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_n] = { 1, 6, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_o] = { 1, 7, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_p] = { 2, 0, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_q] = { 2, 1, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_r] = { 2, 2, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_s] = { 2, 3, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_t] = { 2, 4, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_u] = { 2, 5, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_v] = { 2, 6, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_w] = { 2, 7, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_x] = { 3, 0, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_y] = { 3, 1, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_z] = { 3, 2, ST_FORCE_UP };
-#endif
+    m[KEYCAP_1_EXCLAMATION] = { 4, 1 };
+    m[KEYCAP_2_AT] = { 4, 2, ST_NEUTRAL, 0, 0, ST_FORCE_UP };
+    m[KEYCAP_3_NUMBER] = { 4, 3 };
+    m[KEYCAP_4_DOLLAR] = { 4, 4 };
+    m[KEYCAP_5_PERCENT] = { 4, 5 };
+    m[KEYCAP_6_CARET] = { 4, 6, ST_NEUTRAL, -2, -2 };
+    m[KEYCAP_7_AMPERSAND] = { 4, 7, ST_NEUTRAL, 4, 6, ST_FORCE_DOWN };
+    m[KEYCAP_8_ASTERISK] = { 5, 0, ST_NEUTRAL, 5, 2, ST_FORCE_DOWN };
+    m[KEYCAP_9_OPAREN] = { 5, 1, ST_NEUTRAL, 5, 0, ST_FORCE_DOWN };
+    m[KEYCAP_0_CPAREN] = { 4, 0, ST_NEUTRAL, 5, 1, ST_FORCE_DOWN };
 
-    Trs80KeyboardMap[KEYCAP_0_CPAREN] = { 4, 0, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_1_EXCLAMATION] = { 4, 1, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_2_AT] = { 4, 2, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_3_NUMBER] = { 4, 3, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_4_DOLLAR] = { 4, 4, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_5_PERCENT] = { 4, 5, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_6_CARET] = { 4, 6, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_7_AMPERSAND] = { 4, 7, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_8_ASTERISK] = { 5, 0, ST_FORCE_UP };
-    Trs80KeyboardMap[KEYCAP_9_OPAREN] = { 5, 1, ST_FORCE_UP };
-
-    // keyMap.set("_", new KeyInfo(4, 0, ST_FORCE_DOWN)); // Simulate Shift-0, like trsemu.
-    // Trs80KeyboardMap[KEYCAP_!] = { 4, 1, ST_FORCE_DOWN };
-    // Trs80KeyboardMap[KEYCAP_\] = { 4, 2, ST_FORCE_DOWN };
-    // Trs80KeyboardMap[KEYCAP_#] = { 4, 3, ST_FORCE_DOWN };
-    // Trs80KeyboardMap[KEYCAP_$] = { 4, 4, ST_FORCE_DOWN };
-    // Trs80KeyboardMap[KEYCAP_%] = { 4, 5, ST_FORCE_DOWN };
-    // Trs80KeyboardMap[KEYCAP_&] = { 4, 6, ST_FORCE_DOWN };
-    // Trs80KeyboardMap[KEYCAP_'] = { 4, 7, ST_FORCE_DOWN };
-    // Trs80KeyboardMap[KEYCAP_(] = { 5, 0, ST_FORCE_DOWN };
-    // Trs80KeyboardMap[KEYCAP_)] = { 5, 1, ST_FORCE_DOWN };
-
-    // Trs80KeyboardMap[KEYCAP_:] = { 5, 2, ST_FORCE_UP };
-    // Trs80KeyboardMap[KEYCAP_;] = { 5, 3, ST_FORCE_UP };
-    // Trs80KeyboardMap[KEYCAP_,] = { 5, 4, ST_FORCE_UP };
-    // Trs80KeyboardMap[KEYCAP_-] = { 5, 5, ST_FORCE_UP };
-    // Trs80KeyboardMap[KEYCAP_.] = { 5, 6, ST_FORCE_UP };
-    // Trs80KeyboardMap[KEYCAP_/] = { 5, 7, ST_FORCE_UP };
-
-    // Trs80KeyboardMap[KEYCAP_*] = { 5, 2, ST_FORCE_DOWN };
-    // Trs80KeyboardMap[KEYCAP_+] = { 5, 3, ST_FORCE_DOWN };
-    // Trs80KeyboardMap[KEYCAP_<] = { 5, 4, ST_FORCE_DOWN };
-    // Trs80KeyboardMap[KEYCAP_=] = { 5, 5, ST_FORCE_DOWN };
-    // Trs80KeyboardMap[KEYCAP_>] = { 5, 6, ST_FORCE_DOWN };
-    // Trs80KeyboardMap[KEYCAP_?] = { 5, 7, ST_FORCE_DOWN };
-
-    Trs80KeyboardMap[KEYCAP_ENTER] = { 6, 0, ST_NEUTRAL };
-    // Trs80KeyboardMap[KEYCAP_\\] = { 6, 1, ST_NEUTRAL };
-    Trs80KeyboardMap[KEYCAP_ESCAPE] = { 6, 2, ST_NEUTRAL };
-    Trs80KeyboardMap[KEYCAP_UP] = { 6, 3, ST_NEUTRAL };
-    Trs80KeyboardMap[KEYCAP_DOWN] = { 6, 4, ST_NEUTRAL };
-    Trs80KeyboardMap[KEYCAP_LEFT] = { 6, 5, ST_NEUTRAL };
-    Trs80KeyboardMap[KEYCAP_BACKSPACE] = { 6, 5, ST_NEUTRAL };
-    Trs80KeyboardMap[KEYCAP_RIGHT] = { 6, 6, ST_NEUTRAL };
-    Trs80KeyboardMap[KEYCAP_SPACE] = { 6, 7, ST_NEUTRAL };
-    Trs80KeyboardMap[KEYCAP_LEFTSHIFT] = { 7, 0, ST_NEUTRAL };
-    Trs80KeyboardMap[KEYCAP_RIGHTSHIFT] = { 7, 0, ST_NEUTRAL };
-
-#if 0
-    KEYCAP_1_EXCLAMATION,
-    KEYCAP_2_AT,
-    KEYCAP_3_NUMBER,
-    KEYCAP_4_DOLLAR,
-    KEYCAP_5_PERCENT,
-    KEYCAP_6_CARET,
-    KEYCAP_7_AMPERSAND,
-    KEYCAP_8_ASTERISK,
-    KEYCAP_9_OPAREN,
-    KEYCAP_0_CPAREN,
-    KEYCAP_TAB,
-    KEYCAP_HYPHEN_UNDER,
-    KEYCAP_EQUAL_PLUS,
-    KEYCAP_OBRACKET_OBRACE,
-    KEYCAP_CBRACKET_CBRACE,
-    KEYCAP_BACKSLASH_PIPE,
-    KEYCAP_HASH_TILDE,
-    KEYCAP_SEMICOLON_COLON,
-    KEYCAP_SINGLEQUOTE_DOUBLEQUOTE,
-    KEYCAP_GRAVE_TILDE,
-    KEYCAP_COMMA_LESS,
-    KEYCAP_PERIOD_GREATER,
-    KEYCAP_SLASH_QUESTION,
-#endif
+    m[KEYCAP_SINGLEQUOTE_DOUBLEQUOTE] = { 4, 7, ST_FORCE_DOWN, 4, 2, ST_FORCE_DOWN };
+    m[KEYCAP_ENTER] = { 6, 0, ST_NEUTRAL };
+    m[KEYCAP_BACKSLASH_PIPE] = { 6, 1, ST_NEUTRAL, KEYBOARD_IGNORE }; // Clear
+    m[KEYCAP_ESCAPE] = { 6, 2, ST_NEUTRAL, KEYBOARD_IGNORE }; // Break
+    m[KEYCAP_UP] = { 6, 3, ST_NEUTRAL };
+    m[KEYCAP_DOWN] = { 6, 4, ST_NEUTRAL };
+    m[KEYCAP_LEFT] = { 6, 5, ST_NEUTRAL };
+    m[KEYCAP_BACKSPACE] = { 6, 5, ST_NEUTRAL };
+    m[KEYCAP_RIGHT] = { 6, 6, ST_NEUTRAL };
+    m[KEYCAP_SPACE] = { 6, 7, ST_NEUTRAL };
+    m[KEYCAP_LEFTSHIFT] = { 7, 0, ST_NEUTRAL };
+    m[KEYCAP_RIGHTSHIFT] = { 7, 1, ST_NEUTRAL };
+    // Simulate Shift-0, like trsemu:
+    m[KEYCAP_HYPHEN_UNDER] = { 5, 5, ST_FORCE_UP, 4, 0, ST_FORCE_DOWN };
+    m[KEYCAP_SEMICOLON_COLON] = { 5, 3, ST_FORCE_UP, 5, 2, ST_FORCE_UP };
+    m[KEYCAP_COMMA_LESS] = { 5, 4 };
+    m[KEYCAP_PERIOD_GREATER] = { 5, 6 };
+    m[KEYCAP_SLASH_QUESTION] = { 5, 7 };
+    m[KEYCAP_EQUAL_PLUS] = { 5, 5, ST_FORCE_DOWN, 5, 3, ST_FORCE_DOWN };
+    m[KEYCAP_GRAVE_TILDE] = { 0, 0, ST_FORCE_DOWN, KEYBOARD_IGNORE };
 }
 
 // Release all keys.
 static void clearKeyboard(Trs80Machine *machine) {
     memset(machine->keys, 0, sizeof(machine->keys));
     machine->shiftForce = ST_NEUTRAL;
+    machine->leftShiftPressed = false;
+    machine->rightShiftPressed = false;
 }
 
 // Read a byte from the keyboard memory bank. This is an odd system where
@@ -310,10 +270,14 @@ static uint8_t readKeyboard(Trs80Machine *machine, uint16_t addr) {
     }
 #endif
 
-    // OR together the various bytes.
+    // There are 8 keyboard bytes, and the corresponding bit of the I/O/ read
+    // address tells you which of the 8 bytes are OR'ed into the result. Address 0
+    // is always 0x00, and address 255 is the OR of all 8 bytes. To check
+    // all the keys individually, you want to check address 1, 2, 4, 8, 16, etc.
     for (int i = 0; i < 8; i++) {
-        uint8_t keys = machine->keys[i];
         if ((addr & (1 << i)) != 0) {
+            uint8_t keys = machine->keys[i];
+
             if (i == 7) {
                 // Modify keys based on the shift force.
                 switch (machine->shiftForce) {
@@ -322,8 +286,7 @@ static uint8_t readKeyboard(Trs80Machine *machine, uint16_t addr) {
                         break;
 
                     case ST_FORCE_UP:
-                        // On the Model III the first two bits are left and right shift,
-                        // though we don't handle the right shift anywhere.
+                        // On the Model III the first two bits are left and right shift.
                         keys &= ~0x03;
                         break;
 
@@ -340,16 +303,52 @@ static uint8_t readKeyboard(Trs80Machine *machine, uint16_t addr) {
     return b;
 }
 
-static void handleKeypress(Trs80Machine *machine, int key, int isPress) {
-    auto itr = Trs80KeyboardMap.find(key);
-    if (itr != Trs80KeyboardMap.end()) {
+// Handle a keypress on the real machine, update memory-mapped I/O.
+static void handleKeypress(Trs80Machine *machine, int key, bool isPress) {
+    // Remember shift state.
+    if (key == KEYCAP_LEFTSHIFT) {
+        machine->leftShiftPressed = isPress;
+    }
+    if (key == KEYCAP_RIGHTSHIFT) {
+        machine->rightShiftPressed = isPress;
+    }
+
+    // Find the info for this keycap.
+    auto itr = machine->keymap.find(key);
+    if (itr != machine->keymap.end()) {
         KeyInfo &keyInfo = itr->second;
-        machine->shiftForce = keyInfo.shiftForce;
-        uint8_t bit = 1 << keyInfo.bitNumber;
+
+        // Remember shifted state for the release, in case the user releases
+        // Shift before releasing the key.
+        bool shiftPressed;
         if (isPress) {
-            machine->keys[keyInfo.byteIndex] |= bit;
+            shiftPressed = machine->leftShiftPressed || machine->rightShiftPressed;
+            keyInfo.shiftPressed = shiftPressed;
         } else {
-            machine->keys[keyInfo.byteIndex] &= ~bit;
+            shiftPressed = keyInfo.shiftPressed;
+        }
+
+        // Use the alternate info if available for this keycap.
+        bool haveShiftedData = keyInfo.shiftedByteIndex != KEYBOARD_USE_UNSHIFTED;
+        bool useShiftedData = shiftPressed && haveShiftedData;
+        int byteIndex = useShiftedData
+            ? keyInfo.shiftedByteIndex
+            : keyInfo.byteIndex;
+        int bitNumber = useShiftedData
+            ? keyInfo.shiftedBitNumber
+            : keyInfo.bitNumber;
+
+        if (byteIndex != KEYBOARD_IGNORE) {
+            // Update the keyboard matrix bit.
+            machine->shiftForce = useShiftedData
+                ? keyInfo.shiftedShiftForce
+                : keyInfo.shiftForce;
+            uint8_t bit = 1 << bitNumber;
+            if (isPress) {
+                machine->keys[byteIndex] |= bit;
+            } else {
+                machine->keys[byteIndex] &= ~bit;
+            }
         }
     }
 }
@@ -501,11 +500,9 @@ int trs80_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
     bool quit = false;
     Trs80Machine *machine = new Trs80Machine;
-    memset(machine, 0, sizeof(*machine));
 
     // Set up the display.
     RoNTSCSetMode(0, Trs80TextModeInitVideoMemory, Trs80TextModeFillRowBuffer, Trs80TextModeNeedsColorburst);
-    Trs80TextModeClearDisplay();
 #if 0
     // For when debugging the character set.
     for (int i = 0; i < 256; i++) {
@@ -528,7 +525,7 @@ int trs80_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     }
     fclose(fp);
 
-    initializeKeyboardMap();
+    initializeKeyboardMap(machine);
     resetMachine(machine);
 
     clk_t tStateCount = 0;
