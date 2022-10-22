@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <vector>
 #include "rocinante.h"
 #include "text-mode.h"
 #include "ui.h"
@@ -14,9 +15,15 @@ int launcher_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
     while(1) {
         RoTextMode();
-        const char* applications[] = {"MP3 Player", "Colecovision Emulator", "Apple //e Emulator", "TRS-80 Emulator"};
+        std::vector<const char*> applications = {
+            "MP3 Player",
+            "Colecovision Emulator",
+            "Apple //e Emulator",
+            "Apple //e Emulator (no disk II)",
+            "TRS-80 Emulator"
+        };
         int whichApplication;
-        Status result = RoPromptUserToChooseFromList("Choose an application", applications, 4, &whichApplication, 0);
+        Status result = RoPromptUserToChooseFromList("Choose an application", applications.data(), applications.size(), &whichApplication, 0);
 
         if(result != RO_SUCCESS) {
             continue;
@@ -85,6 +92,18 @@ int launcher_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
             }
 
             case 3: {
+                printf("Starting Apple ][ emulation menu\n");
+
+                const char *args[] = {
+                    "apple2e",
+                    "apple2e.rom",
+                };
+                apple2_main(sizeof(args) / sizeof(args[0]), args); /* doesn't return */
+
+                break;
+            }
+
+            case 4: {
                 const char *args[] = {
                     "trs80",
                 };
