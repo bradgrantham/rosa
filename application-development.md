@@ -10,7 +10,7 @@ The Rosa Emulator, `rosa-emu`, allows rapid development in desktop environments 
 
 ### Build Requirements
 
-Building `rosa-emu` requires SDL2 development libraries with CMake configuration to find the SDL libraries and headers.  For MacOS, MacPorts and Homebrew provide an `sdl2` package.  For Debian-derived Linux distributions, try `libsdl2-dev`.  On Windows one may have to download a CMake SDL2 development package, create a  directory using `-DSDL2_DIR=...` .  See https://trenki2.github.io/blog/2017/06/02/using-sdl2-with-cmake/ for more information.
+Building `rosa-emu` requires SDL2 development libraries with CMake configuration to find the SDL libraries and headers.  For MacOS, MacPorts and Homebrew provide an `sdl2` package.  For Debian-derived Linux distributions, try `libsdl2-dev`.  It probably won't build on Windows yet, but in any case one may have to download a CMake SDL2 development package, create a  directory using `-DSDL2_DIR=...`; see https://trenki2.github.io/blog/2017/06/02/using-sdl2-with-cmake/ for more information.
 
 ### Example commands for cloning, configuring, and building `rosa-emu`:
 
