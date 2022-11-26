@@ -1,7 +1,9 @@
+#include <numeric>
 #include <cstdio>
 #include <cstdlib>
 #include <cassert>
 #include <thread>
+#include <deque>
 #include <chrono>
 #include <array>
 #include <dirent.h>
@@ -315,7 +317,131 @@ static void HandleEvents(void)
     }
 }
 
-void Frame(unsigned char *samples)
+std::array<float, 4> carrierIQ;
+
+void InitColorDecodeTables(float degrees)
+{
+    float theta = (degrees / 360.0f) * M_PI * 2; // [0..359] => [0..Math.PI*2)
+
+    carrierIQ = {
+        sinf(theta),
+        sinf(theta + M_PI / 2),
+        sinf(theta + M_PI),
+        sinf(theta + M_PI * 3 / 2),
+    };
+}
+
+void colorHSVToRGB3f(float h, float s, float v, float *r, float *g, float *b)
+{
+    if(s < .00001) {
+        *r = v; *g = v; *b = v;
+    } else {
+        int i;
+        float p, q, t, f;
+
+        h = fmod(h, M_PI * 2);  /* wrap just in case */
+
+        i = floor(h / (M_PI / 3));
+
+        /*
+         * would have used "f = fmod(h, M_PI / 3);", but fmod seems to have
+         * a bug under Linux.
+         */
+
+        f = h / (M_PI / 3) - floor(h / (M_PI / 3));
+
+        p = v * (1 - s);
+        q = v * (1 - s * f);
+        t = v * (1 - s * (1 - f));
+        switch(i) {
+            case 0: *r = v; *g = t; *b = p; break;
+            case 1: *r = q; *g = v; *b = p; break;
+            case 2: *r = p; *g = v; *b = t; break;
+            case 3: *r = p; *g = q; *b = v; break;
+            case 4: *r = t; *g = p; *b = v; break;
+            case 5: *r = v; *g = p; *b = q; break;
+        }
+    }
+}
+
+template <typename T, int N>
+struct Averager
+{
+    int where{0};
+    T sum;
+    std::array<T, N> data;
+
+    Averager(T init)
+    {
+        data.fill(init);
+        sum = init * N;
+    }
+
+    void update(T val)
+    {
+        sum -= data.at(where);
+        data[where] = val;
+        sum += val;
+        where = (where + 1) % N;
+    }
+
+    T at(int i)
+    {
+        return data.at(i);
+    }
+
+    operator float()
+    {
+        return sum / N;
+    }
+};
+
+void DecodeColorToRGB(uint8_t *samples, uint8_t *rgb)
+{
+    const static uint8_t ymin = 86;
+    const static uint8_t ymax = 255;
+
+    const static float inverse_range = 1.0f / (ymax - ymin);
+
+    float sample = (std::clamp(samples[0], ymin, ymax) - ymin) * inverse_range; // 0 to 1
+    Averager<float, 4> luminance_averaged(sample);
+    float chrominance;
+
+    for(int idx = 0; idx < 704; idx++) {
+        float saturation;
+
+        float sample = (std::clamp(samples[idx], ymin, ymax) - ymin) * inverse_range; // 0 to 1
+
+        {
+            luminance_averaged.update(sample);
+
+            saturation = 0.0;
+            for(int i = 0; i < 4; i++) {
+                float y = luminance_averaged.at(i);
+                float difference = y - luminance_averaged; // -1 to 1
+                float magnitude = fabsf(difference); // 0 to 1
+                saturation = std::max(saturation, magnitude);
+            }
+
+            saturation = std::min(saturation * 2, 1.0f);
+            float signal = sample - luminance_averaged; // -1 to 1
+
+            float i = signal * carrierIQ.at(idx % 4);
+            float q = signal * carrierIQ.at((idx + 1) % 4);
+
+            chrominance = atan2f(q, i) + M_PI; // 0..Math.PI*2
+        }
+
+        float r, g, b;
+        colorHSVToRGB3f(chrominance, saturation, std::min(luminance_averaged * 2, 1.0f), &r, &g, &b);
+        uint8_t *pixelp = rgb + idx * 3;
+        pixelp[0] = b * 255.999f;
+        pixelp[1] = g * 255.999f;
+        pixelp[2] = r * 255.999f;
+    }
+}
+
+void Frame(unsigned char *samples, bool decodeColor)
 {
     using namespace std::chrono_literals;
 
@@ -323,12 +449,18 @@ void Frame(unsigned char *samples)
 
     uint8_t* framebuffer = reinterpret_cast<uint8_t*>(surface->pixels);
     for(int y = 0; y < 480; y++) {
-        for(int x = 0; x < 704; x++) {
-            uint8_t *pixel = framebuffer + 3 * (x + y * SCREEN_X);
-            uint8_t *sample = samples + x + y * SCREEN_X;
-            pixel[0] = sample[0];
-            pixel[1] = sample[0];
-            pixel[2] = sample[0];
+        if(decodeColor) {
+            uint8_t *rowsamples = samples + y * SCREEN_X;
+            uint8_t *rowpixels = framebuffer + 3 * y * SCREEN_X;
+            DecodeColorToRGB(rowsamples, rowpixels);
+        } else {
+            for(int x = 0; x < 704; x++) {
+                uint8_t *pixel = framebuffer + 3 * (x + y * SCREEN_X);
+                uint8_t *sample = samples + x + y * SCREEN_X;
+                pixel[0] = sample[0];
+                pixel[1] = sample[0];
+                pixel[2] = sample[0];
+            }
         }
     }
 
@@ -522,7 +654,7 @@ void RoNTSCSetMode(int interlaced_, RoNTSCModeInitVideoMemoryFunc initFunc, RoNT
     NTSCModeInterlaced = interlaced_;
 
     /* Should black and white be similar to HW values to exercise reduced precision? */
-    int result = initFunc(VideoMemoryBuffer, sizeof(VideoMemoryBuffer), 0, 255);
+    [[maybe_unused]] int result = initFunc(VideoMemoryBuffer, sizeof(VideoMemoryBuffer), 0, 255);
     assert(result == 1);
 
     NTSCModeFuncsValid = true;
@@ -576,41 +708,24 @@ int RoDoHousekeeping(void)
         if(NTSCModeInterlaced) {
             for(int lineNumber = 0; lineNumber < 480; lineNumber++) {
                 if(NTSCModeFuncsValid) {
-                    memset(samples + lineNumber * 704, 0, 704);
+                    memset(samples + lineNumber * 704, 86, 704);
                     NTSCModeFillRowBuffer(0, lineNumber, 704, samples + lineNumber * 704);
-                    if(needsColorburst) {
-                        // blur for now
-                        for(int x = 0; x < 704 - 3; x++) {
-                            samples[lineNumber * 704 + x + 0] =
-                                samples[lineNumber * 704 + x + 0] * .2 +
-                                samples[lineNumber * 704 + x + 1] * .3 + 
-                                samples[lineNumber * 704 + x + 2] * .3 +
-                                samples[lineNumber * 704 + x + 3] * .2;
-                        }
-                    }
                 }
             }
         } else {
+            // FILE *fp = fopen("foo.bin", "wb");
             for(int lineNumber = 0; lineNumber < 240; lineNumber++) {
                 if(NTSCModeFuncsValid) {
-                    memset(samples + (lineNumber * 2 + 0) * 704, 0, 704);
+                    memset(samples + (lineNumber * 2 + 0) * 704, 86, 704);
                     NTSCModeFillRowBuffer(0, lineNumber, 704, samples + (lineNumber * 2 + 0) * 704);
-                    if(needsColorburst) {
-                        // blur for now
-                        for(int x = 0; x < 704 - 3; x++) {
-                            samples[(lineNumber * 2 + 0) * 704 + x + 0] =
-                                samples[(lineNumber * 2 + 0) * 704 + x + 0] * .2 +
-                                samples[(lineNumber * 2 + 0) * 704 + x + 1] * .3 + 
-                                samples[(lineNumber * 2 + 0) * 704 + x + 2] * .3 +
-                                samples[(lineNumber * 2 + 0) * 704 + x + 3] * .2;
-                        }
-                    }
+                    // fwrite(samples + (lineNumber * 2 + 0) * 704, 704, 1, fp);
                     memcpy(samples + (lineNumber * 2 + 1) * 704, samples + (lineNumber * 2 + 0) * 704, 704);
                 }
             }
+            // fclose(fp);
         }
 
-        Frame(samples);
+        Frame(samples, needsColorburst);
     }
 
     return 0;
@@ -642,6 +757,8 @@ int main(int argc, char **argv)
 {
     uint32_t stereoU8SampleRate;
     size_t preferredAudioBufferSizeBytes;
+
+    InitColorDecodeTables(getenv("OFFSET") ? atof(getenv("OFFSET")) : 267.0f);
 
     const char *rootDirName = nullptr;
 
