@@ -447,8 +447,6 @@ void DecodeColorToRGB(uint8_t *samples, uint8_t *rgb)
 
 void Frame(unsigned char *samples, bool decodeColor)
 {
-    using namespace std::chrono_literals;
-
     if (SDL_MUSTLOCK(surface)) SDL_LockSurface(surface);
 
     uint8_t* framebuffer = reinterpret_cast<uint8_t*>(surface->pixels);
@@ -470,32 +468,15 @@ void Frame(unsigned char *samples, bool decodeColor)
 
     if (SDL_MUSTLOCK(surface)) SDL_UnlockSurface(surface);
 
-#if 0
-    std::chrono::time_point<std::chrono::system_clock> now = std::chrono::system_clock::now();
-    std::chrono::duration<float> elapsed;
-    
-    elapsed = now - previous_event_time;
-    if(elapsed.count() > .05) {
-        HandleEvents();
-        previous_event_time = now;
+    SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
+    if(!texture) {
+        printf("could not create texture\n");
+        exit(1);
     }
-
-    elapsed = now - previous_draw_time;
-    if(elapsed.count() > .05) {
-#endif
-        SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
-        if(!texture) {
-            printf("could not create texture\n");
-            exit(1);
-        }
-        SDL_RenderClear(renderer);
-        SDL_RenderCopy(renderer, texture, NULL, NULL);
-        SDL_RenderPresent(renderer);
-        SDL_DestroyTexture(texture);
-#if 0
-        previous_draw_time = now;
-    }
-#endif
+    SDL_RenderClear(renderer);
+    SDL_RenderCopy(renderer, texture, NULL, NULL);
+    SDL_RenderPresent(renderer);
+    SDL_DestroyTexture(texture);
 }
 
 #if defined(EMSCRIPTEN)
@@ -717,16 +698,13 @@ int RoDoHousekeeping(void)
                 }
             }
         } else {
-            // FILE *fp = fopen("foo.bin", "wb");
             for(int lineNumber = 0; lineNumber < 240; lineNumber++) {
                 if(NTSCModeFuncsValid) {
                     memset(samples + (lineNumber * 2 + 0) * 704, 86, 704);
                     NTSCModeFillRowBuffer(0, lineNumber, 704, samples + (lineNumber * 2 + 0) * 704);
-                    // fwrite(samples + (lineNumber * 2 + 0) * 704, 704, 1, fp);
                     memcpy(samples + (lineNumber * 2 + 1) * 704, samples + (lineNumber * 2 + 0) * 704, 704);
                 }
             }
-            // fclose(fp);
         }
 
         Frame(samples, needsColorburst);
