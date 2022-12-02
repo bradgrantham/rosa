@@ -122,6 +122,11 @@ uint8_t RoGetKeypadState(RoControllerIndex which);
 
 #define INLINE inline
 
+INLINE float RoDACValueToVoltage(uint8_t value)
+{
+    return value * MAX_DAC_VOLTAGE / 255;
+}
+
 INLINE unsigned char RoDACVoltageToValue(float voltage)
 {
     if(voltage < 0.0f) {

@@ -401,6 +401,9 @@ void DecodeColorToRGB(uint8_t *samples, uint8_t *rgb)
     float voltage = RoDACValueToVoltage(samples[0]);
     float value = (voltage - NTSC_SYNC_BLACK_VOLTAGE) / (NTSC_SYNC_WHITE_VOLTAGE - NTSC_SYNC_BLACK_VOLTAGE);
     Averager<float, 4> value_averaged(value);
+    Averager<float, 4> y_averaged(0);
+    Averager<float, 4> i_averaged(0);
+    Averager<float, 4> q_averaged(0);
     [[maybe_unused]] float chrominance;
     [[maybe_unused]] float y;
     float i, q;
@@ -426,16 +429,19 @@ void DecodeColorToRGB(uint8_t *samples, uint8_t *rgb)
         float signal = value - y;
         i = signal * carrierIQ.at(idx % 4);
         q = signal * carrierIQ.at((idx + 3) % 4);
+        y_averaged.update(y);
+        i_averaged.update(i);
+        q_averaged.update(q);
 
         chrominance = atan2f(q, i) + M_PI; // 0..Math.PI*2
 
         float r, g, b;
-        // colorHSVToRGB3f(chrominance, saturation, std::min(y * 2, 1.0f), &r, &g, &b);
-        RoYIQToRGB(y, i, q, &r, &g, &b);
+        RoYIQToRGB(y_averaged, i_averaged, q_averaged, &r, &g, &b);
+
         uint8_t *pixelp = rgb + idx * 3;
-        pixelp[0] = b * 255.999f;
-        pixelp[1] = g * 255.999f;
-        pixelp[2] = r * 255.999f;
+        pixelp[0] = std::clamp(b, 0.0f, 1.0f) * 255.999f;
+        pixelp[1] = std::clamp(g, 0.0f, 1.0f) * 255.999f;
+        pixelp[2] = std::clamp(r, 0.0f, 1.0f) * 255.999f;
     }
 }
 
