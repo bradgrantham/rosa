@@ -20,7 +20,7 @@ namespace PlatformInterface
 
 /* actually 682.6_ 14MHz clocks because 5.3MHz TMS9918A pixel clock */
 /* so the last pixel is extended another 1/3 to fill last clock */
-#define Pixmap256_192_4b_MODE_WIDTH 683
+#define Pixmap256_192_4b_MODE_WIDTH 512
 #define Pixmap256_192_4b_MODE_LEFT ((704 - Pixmap256_192_4b_MODE_WIDTH) / 2) 
 // 65 
 #define Pixmap256_192_4b_MODE_HEIGHT 192 
@@ -83,33 +83,12 @@ __attribute__((hot,flatten)) void Pixmap256_192_4b_ModeFillRowBuffer([[maybe_unu
         // convert rowColors to NTSC waveform into rowDst 2 2/3 samples at a time.  8-|
         uint16_t index = Pixmap256_192_4b_MODE_LEFT;
 
-        for(int i = 0; i < 255; i += 3) {
-            // First color covers 2 and 2/3 of a pixel
+        for(int i = 0; i < 255; i++) {
             uint8_t *color = Pixmap256_192_4b_ColorsToNTSC[Pixmap256_192_4b_GetColorIndex(i, rowColors)];
             rowBuffer[index + 0] = color[(index + 0) % 4];
             rowBuffer[index + 1] = color[(index + 1) % 4];
-            uint8_t carry_over = color[(index + 2) % 4];
-
-            // second color covers 1/3, 2, and 1/3 of a pixel
-            color = Pixmap256_192_4b_ColorsToNTSC[Pixmap256_192_4b_GetColorIndex(i + 1, rowColors)];
-            rowBuffer[index + 2] = (carry_over * 6 + color[(index + 2) % 4] * 3) / 9;
-            rowBuffer[index + 3] = color[(index + 3) % 4];
-            rowBuffer[index + 4] = color[(index + 4) % 4];
-            carry_over = color[(index + 5) % 4];
-
-            // third color covers 2/3 and 2 pixels
-            color = Pixmap256_192_4b_ColorsToNTSC[Pixmap256_192_4b_GetColorIndex(i + 2, rowColors)];
-            rowBuffer[index + 5] = (carry_over * 3 + color[(index + 5) % 4] * 6) / 9;
-            rowBuffer[index + 6] = color[(index + 6) % 4];
-            rowBuffer[index + 7] = color[(index + 7) % 4];
-
-            index += 8;
+            index += 2;
         }
-        // And last pixel is special case
-        uint8_t *color = Pixmap256_192_4b_ColorsToNTSC[Pixmap256_192_4b_GetColorIndex(255, rowColors)];
-        rowBuffer[index + 0] = color[(index + 0) % 4];
-        rowBuffer[index + 1] = color[(index + 1) % 4];
-        rowBuffer[index + 2] = color[(index + 2) % 4];
     }
 }
 
