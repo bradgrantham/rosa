@@ -2466,7 +2466,7 @@ int apple2_main(int argc, const char **argv)
                 }
             }
             clk_t prev_clock = clk;
-            clk_t prev_housekeeping_clock = clk;
+            chrono::time_point<chrono::system_clock> housekeeping_prev = std::chrono::system_clock::now();
             while(clk - prev_clock < clocks_per_slice) {
                 if(debug & DEBUG_DECODE) {
                     string dis = read_bus_and_disassemble(bus,
@@ -2490,9 +2490,11 @@ int apple2_main(int argc, const char **argv)
                     }
                 }
 #if defined(ROSA)
-                if(clk - prev_housekeeping_clock > clocks_per_slice) {
+                chrono::time_point<chrono::system_clock> housekeeping_now = std::chrono::system_clock::now();
+                auto housekeeping_micros = chrono::duration_cast<chrono::microseconds>(housekeeping_now - cpu_speed_then);
+                if(housekeeping_micros.count() > 1000) {
                     RoDoHousekeeping();
-                    prev_housekeeping_clock = clk;
+                    housekeeping_prev = housekeeping_now;
                 }
 #endif
                 if(debug & DEBUG_CLOCK) {
