@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <string>
 #include <vector>
 #include "rocinante.h"
 #include "text-mode.h"
@@ -10,6 +11,32 @@ int apple2_main(int argc, const char **argv);
 int coleco_main(int argc, const char **argv);
 int mp3player_main(int argc, const char **argv);
 int trs80_main(int argc, const char **argv);
+
+struct LauncherRecord
+{
+    // Should std::move
+    std::string name;
+    std::string what_to_choose;
+    std::string where_to_choose;
+    std::string suffix;
+    std::vector<std::string> initial_args;
+    int (*main)(int argc, const char **argv);
+};
+
+std::vector<LauncherRecord> Apps;
+
+void LauncherRegisterApp(const std::string& name, const std::string& what_to_choose, const std::string& where_to_choose, const std::string& suffix, const std::vector<std::string>& initial_args, int (*main)(int argc, const char **argv))
+{
+    LauncherRecord rec = {
+        .name = name,
+        .what_to_choose = what_to_choose,
+        .where_to_choose = where_to_choose,
+        .suffix = suffix,
+        .initial_args = initial_args,
+        .main = main
+    };
+    Apps.push_back(rec); // Should std::move
+}
 
 int launcher_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
@@ -67,8 +94,6 @@ int launcher_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
             }
 
             case 2: {
-                printf("Starting Apple ][ emulation menu\n"); // console_flush();
-
                 Status status;
                 char *fileChosenInDir;
                 char fileChosen[512];
@@ -92,8 +117,6 @@ int launcher_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
             }
 
             case 3: {
-                printf("Starting Apple ][ emulation menu\n");
-
                 const char *args[] = {
                     "apple2e",
                     "apple2e.rom",
