@@ -16,23 +16,27 @@ struct LauncherRecord
 {
     // Should std::move
     std::string name;
+    std::string exe_name;
     std::string what_to_choose;
     std::string where_to_choose;
     std::string suffix;
-    std::vector<std::string> initial_args;
+    std::vector<std::string> first_args;
+    std::vector<std::string> last_args;
     int (*main)(int argc, const char **argv);
 };
 
 std::vector<LauncherRecord> Apps;
 
-void LauncherRegisterApp(const std::string& name, const std::string& what_to_choose, const std::string& where_to_choose, const std::string& suffix, const std::vector<std::string>& initial_args, int (*main)(int argc, const char **argv))
+void LauncherRegisterApp(const std::string& name, const std::string& exe_name, const std::string& what_to_choose, const std::string& where_to_choose, const std::string& suffix, const std::vector<std::string>& first_args, const std::vector<std::string>& last_args, int (*main)(int argc, const char **argv))
 {
     LauncherRecord rec = {
         .name = name,
+        .exe_name = exe_name,
         .what_to_choose = what_to_choose,
         .where_to_choose = where_to_choose,
         .suffix = suffix,
-        .initial_args = initial_args,
+        .first_args = first_args,
+        .last_args = last_args,
         .main = main
     };
     Apps.push_back(rec); // Should std::move
@@ -40,15 +44,20 @@ void LauncherRegisterApp(const std::string& name, const std::string& what_to_cho
 
 int launcher_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
+    LauncherRegisterApp("MP3 Player", "mp3player", "an MP3 file", ".", ".mp3", {}, {}, mp3player_main);
+    LauncherRegisterApp("Colecovision Emulator", "emulator", "a Coleco cartridge", "coleco", "", {"coleco/COLECO.ROM"}, {}, coleco_main);
+    LauncherRegisterApp("Apple //e Emulator", "apple2e", "a disk image", "floppies", ".dsk", {"-diskII", "diskII.c600.c6ff.bin"}, {"none", "apple2e.rom"}, apple2_main);
+    LauncherRegisterApp("Apple //e Emulator (no Disk II)", "", "", "", "", {}, {"apple2e.rom"}, apple2_main);
+    LauncherRegisterApp("TRS-80 Emulator", "trs80", "", "", "", {}, {}, trs80_main);
+
+    std::vector<const char*> applications;
+    for(const auto& app: Apps) {
+        // XXX bare pointer to char* to interface with C
+        applications.push_back(app.name.c_str());
+    }
+    
     while(1) {
         RoTextMode();
-        std::vector<const char*> applications = {
-            "MP3 Player",
-            "Colecovision Emulator",
-            "Apple //e Emulator",
-            "Apple //e Emulator (no disk II)",
-            "TRS-80 Emulator"
-        };
         int whichApplication;
         Status result = RoPromptUserToChooseFromList("Choose an application", applications.data(), applications.size(), &whichApplication, 0);
 
@@ -56,85 +65,41 @@ int launcher_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
             continue;
         }
 
-        switch(whichApplication) {
+        const auto& app = Apps[whichApplication];
+        std::vector<const char*> args;
+        args.push_back(app.exe_name.c_str());
+        for(const auto& initarg: app.first_args) {
+            args.push_back(initarg.c_str());
+        }
 
-            case 0: {
-                Status status;
-                char *fileChosenInDir;
-                char fileChosen[512];
+        if(app.what_to_choose.empty()) {
 
-                status = RoPromptUserToChooseFile("Choose an MP3 File", ".", CHOOSE_FILE_IGNORE_DOTFILES, ".mp3", &fileChosenInDir);
-                sprintf(fileChosen, "./%s", fileChosenInDir);
-                if(status == RO_SUCCESS) {
-                    const char *args[] = {
-                        "mp3player",
-                        fileChosen,
-                    };
-                    mp3player_main(sizeof(args) / sizeof(args[0]), args);
+            for(const auto& lastarg: app.last_args) {
+                args.push_back(lastarg.c_str());
+            }
+            app.main(args.size(), args.data());
+            break;
+
+        } else {
+
+            Status status;
+            char *fileChosenInDir;
+            char fileChosen[512];
+
+            const char *suffix = app.suffix.empty() ? NULL : app.suffix.c_str();
+
+            status = RoPromptUserToChooseFile(app.what_to_choose.c_str(), app.where_to_choose.c_str(), CHOOSE_FILE_IGNORE_DOTFILES, suffix, &fileChosenInDir);
+            sprintf(fileChosen, "%s/%s", app.where_to_choose.c_str(), fileChosenInDir);
+            if(status == RO_SUCCESS) {
+                args.push_back(fileChosen);
+                for(const auto& lastarg: app.last_args) {
+                    args.push_back(lastarg.c_str());
                 }
-                break;
-            }
-
-            case 1: {
-                Status status;
-                char *fileChosenInDir;
-                char fileChosen[512];
-
-                status = RoPromptUserToChooseFile("Choose a Coleco Cartridge", "coleco", CHOOSE_FILE_IGNORE_DOTFILES, NULL /* ".dsk" */, &fileChosenInDir);
-                if(status == RO_SUCCESS) {
-                    sprintf(fileChosen, "coleco/%s", fileChosenInDir);
-                    const char *args[] = {
-                        "emulator",
-                        "coleco/COLECO.ROM",
-                        fileChosen,
-                    };
-                    coleco_main(sizeof(args) / sizeof(args[0]), args); /* doesn't return */
-                }
-                break;
-            }
-
-            case 2: {
-                Status status;
-                char *fileChosenInDir;
-                char fileChosen[512];
-
-                status = RoPromptUserToChooseFile("Choose an Apple ][ boot disk", "floppies", CHOOSE_FILE_IGNORE_DOTFILES, NULL /* ".dsk" */, &fileChosenInDir);
-                if(status == RO_SUCCESS) {
-                    sprintf(fileChosen, "floppies/%s", fileChosenInDir);
-                    const char *args[] = {
-                        "apple2e",
-                        // "-fast",
-                        "-diskII", "diskII.c600.c6ff.bin", fileChosen, "none",
-                        "apple2e.rom",
-                    };
-                    apple2_main(sizeof(args) / sizeof(args[0]), args); /* doesn't return */
-
-                } else {
-
-                    // declined or error
-                }
-                break;
-            }
-
-            case 3: {
-                const char *args[] = {
-                    "apple2e",
-                    "apple2e.rom",
-                };
-                apple2_main(sizeof(args) / sizeof(args[0]), args); /* doesn't return */
-
-                break;
-            }
-
-            case 4: {
-                const char *args[] = {
-                    "trs80",
-                };
-                trs80_main(sizeof(args) / sizeof(args[0]), args);
-                break;
+                app.main(args.size(), args.data());
             }
         }
     }
+    return EXIT_SUCCESS;
 }
 
 };
