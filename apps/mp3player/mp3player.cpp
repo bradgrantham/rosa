@@ -16,6 +16,7 @@
 #include "events.h"
 #include "text-mode.h"
 #include "ui.h"
+#include "../launcher/launcher.h"
 
 #define printf RoDebugOverlayPrintf
 
@@ -172,14 +173,19 @@ struct Resampler
 #if defined(ROSA)
 
 extern "C" {
-int mp3player_main(int argc, char **argv);
+int mp3player_main(int argc, const char **argv);
 };
 
 #define main mp3player_main
 
+static int initializer = []() -> int {
+    LauncherRegisterApp("MP3 Player", "mp3player", "an MP3 file", ".", ".mp3", {}, {}, mp3player_main);
+    return 1;
+}();
+
 #endif
 
-int main(int argc, char **argv)
+int main(int argc, const char **argv)
 {
     static mp3dec_t mp3d;
     mp3dec_init(&mp3d);

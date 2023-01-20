@@ -4,6 +4,7 @@
 #include <map>
 #include <deque>
 #include "rocinante.h"
+#include "../launcher/launcher.h"
 #include "events.h"
 #include "fonts.h"
 #include "z80user.h"
@@ -15,8 +16,14 @@
  */
 
 extern "C" {
-int trs80_main(int argc, char **argv);
+int trs80_main(int argc, const char **argv);
 };
+
+static int register_app_initializer = []() -> int {
+    LauncherRegisterApp("TRS-80 Emulator", "trs80", "", "", "", {}, {}, trs80_main);
+    return 1;
+}();
+
 
 typedef long long clk_t;
 
@@ -530,7 +537,7 @@ void Trs80WritePort(Trs80Machine *machine, uint8_t address, uint8_t value) {
     }
 }
 
-int trs80_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
+int trs80_main([[maybe_unused]] int argc, [[maybe_unused]] const char **argv)
 {
     bool quit = false;
     Trs80Machine *machine = new Trs80Machine;

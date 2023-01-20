@@ -4,13 +4,7 @@
 #include "rocinante.h"
 #include "text-mode.h"
 #include "ui.h"
-
-extern "C" {
-
-int apple2_main(int argc, const char **argv);
-int coleco_main(int argc, const char **argv);
-int mp3player_main(int argc, const char **argv);
-int trs80_main(int argc, const char **argv);
+#include "launcher.h"
 
 struct LauncherRecord
 {
@@ -25,7 +19,7 @@ struct LauncherRecord
     int (*main)(int argc, const char **argv);
 };
 
-std::vector<LauncherRecord> Apps;
+std::vector<LauncherRecord> *Apps;
 
 void LauncherRegisterApp(const std::string& name, const std::string& exe_name, const std::string& what_to_choose, const std::string& where_to_choose, const std::string& suffix, const std::vector<std::string>& first_args, const std::vector<std::string>& last_args, int (*main)(int argc, const char **argv))
 {
@@ -39,19 +33,19 @@ void LauncherRegisterApp(const std::string& name, const std::string& exe_name, c
         .last_args = last_args,
         .main = main
     };
-    Apps.push_back(rec); // Should std::move
+    if(Apps == nullptr) {
+        Apps = new std::vector<LauncherRecord>;
+    }
+    Apps->push_back(rec); // Should std::move
+    printf("registered %s, apps = %zd\n", name.c_str(), Apps->size());
 }
+
+extern "C" {
 
 int launcher_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
-    LauncherRegisterApp("MP3 Player", "mp3player", "an MP3 file", ".", ".mp3", {}, {}, mp3player_main);
-    LauncherRegisterApp("Colecovision Emulator", "emulator", "a Coleco cartridge", "coleco", "", {"coleco/COLECO.ROM"}, {}, coleco_main);
-    LauncherRegisterApp("Apple //e Emulator", "apple2e", "a disk image", "floppies", ".dsk", {"-diskII", "diskII.c600.c6ff.bin"}, {"none", "apple2e.rom"}, apple2_main);
-    LauncherRegisterApp("Apple //e Emulator (no Disk II)", "", "", "", "", {}, {"apple2e.rom"}, apple2_main);
-    LauncherRegisterApp("TRS-80 Emulator", "trs80", "", "", "", {}, {}, trs80_main);
-
     std::vector<const char*> applications;
-    for(const auto& app: Apps) {
+    for(const auto& app: (*Apps)) {
         // XXX bare pointer to char* to interface with C
         applications.push_back(app.name.c_str());
     }
@@ -65,7 +59,7 @@ int launcher_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
             continue;
         }
 
-        const auto& app = Apps[whichApplication];
+        const auto& app = (*Apps)[whichApplication];
         std::vector<const char*> args;
         args.push_back(app.exe_name.c_str());
         for(const auto& initarg: app.first_args) {

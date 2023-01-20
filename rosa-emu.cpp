@@ -449,6 +449,7 @@ void Frame(unsigned char *samples, bool decodeColor)
 {
     if (SDL_MUSTLOCK(surface)) SDL_LockSurface(surface);
 
+    auto before = std::chrono::system_clock::now();
     uint8_t* framebuffer = reinterpret_cast<uint8_t*>(surface->pixels);
     for(int y = 0; y < 480; y++) {
         if(decodeColor) {
@@ -465,7 +466,11 @@ void Frame(unsigned char *samples, bool decodeColor)
             }
         }
     }
+    auto after = std::chrono::system_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(after - before).count();
+    if(0) printf("samples to RGB took %.2fms\n", elapsed / 1000.0f);
 
+    before = std::chrono::system_clock::now();
     if (SDL_MUSTLOCK(surface)) SDL_UnlockSurface(surface);
 
     SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
@@ -477,6 +482,9 @@ void Frame(unsigned char *samples, bool decodeColor)
     SDL_RenderCopy(renderer, texture, NULL, NULL);
     SDL_RenderPresent(renderer);
     SDL_DestroyTexture(texture);
+    after = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::microseconds>(after - before).count();
+    if(0) printf("SDL texture upload took %.2fms\n", elapsed / 1000.0f);
 }
 
 #if defined(EMSCRIPTEN)
@@ -670,14 +678,24 @@ uint32_t RoGetMillis()
 
 int RoDoHousekeeping(void)
 {
-    static std::chrono::time_point<std::chrono::system_clock> last_event_handling = std::chrono::system_clock::now();
-    static std::chrono::time_point<std::chrono::system_clock> last_frame_processing = std::chrono::system_clock::now();
+    static auto last_housekeeping = std::chrono::system_clock::now();
+    static auto last_event_handling = std::chrono::system_clock::now();
+    static auto last_frame_processing = std::chrono::system_clock::now();
 
-    std::chrono::time_point<std::chrono::system_clock> now = std::chrono::system_clock::now();
+    auto now = std::chrono::system_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_event_handling).count();
+    last_housekeeping = now;
+    if(0) printf("application processing took %.2fms\n", elapsed / 1000.0f);
+
+    now = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_event_handling).count();
     if(elapsed > 20) {
         last_event_handling = now;
+        auto before = std::chrono::system_clock::now();
         HandleEvents();
+        auto after = std::chrono::system_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(after - before).count();
+        if(0) printf("event handling took %.2fms\n", elapsed / 1000.0f);
         if(quit_requested) {
             SDL_Quit();
             exit(0);
@@ -690,6 +708,7 @@ int RoDoHousekeeping(void)
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_frame_processing).count();
     if(elapsed > 15) {
         last_frame_processing = now;
+        auto caliper_start = std::chrono::system_clock::now();
         if(NTSCModeInterlaced) {
             for(int lineNumber = 0; lineNumber < 480; lineNumber++) {
                 if(NTSCModeFuncsValid) {
@@ -706,6 +725,9 @@ int RoDoHousekeeping(void)
                 }
             }
         }
+        auto caliper_end = std::chrono::system_clock::now();
+        auto caliper_elapsed = std::chrono::duration_cast<std::chrono::microseconds>(caliper_end - caliper_start).count();
+        if(0) printf("filling row buffers took %.2fms\n", caliper_elapsed / 1000.0f);
 
         Frame(samples, needsColorburst);
     }

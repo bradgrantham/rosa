@@ -39,6 +39,7 @@
 
 #if defined(ROSA)
 #include "rocinante.h"
+#include "../launcher/launcher.h"
 #endif
 
 // Wrap the entire app in a namespace to protect from other apps if linked together.
@@ -1633,7 +1634,7 @@ struct Debugger
 volatile bool run_fast = false;
 volatile bool pause_cpu = false;
 
-void usage(char *progname)
+void usage(const char *progname)
 {
     printf("\n");
     printf("usage: %s [options] bios.bin cartridge.bin\n", progname);
@@ -1762,10 +1763,17 @@ void set_colecovision_context(ColecovisionContext *colecovision_context, RAMboar
 #if defined(ROSA)
 
 extern "C" {
-int coleco_main(int argc, char **argv);
+int coleco_main(int argc, const char **argv);
 };
 
 #define main coleco_main
+
+static volatile int register_app_initializer = []() -> int {
+    printf("%s\n", __FILE__);
+    LauncherRegisterApp("Colecovision Emulator", "emulator", "a Coleco cartridge", "coleco", "", {"coleco/COLECO.ROM"}, {}, coleco_main);
+    return 1;
+}();
+
 
 #endif
 
@@ -1815,7 +1823,7 @@ void cv_out_byte(void* ctx_, uint16_t address16, uint8_t value)
 }; // namespace ColecovisionEmulator
 
 
-int main(int argc, char **argv)
+int main(int argc, const char **argv)
 {
     bool freerun = false;
     using namespace PlatformInterface;
@@ -1834,7 +1842,7 @@ int main(int argc, char **argv)
     std::string playback_controller_filename;
 #endif
 
-    char *progname = argv[0];
+    const char *progname = argv[0];
     argc -= 1;
     argv += 1;
 
@@ -1938,8 +1946,8 @@ int main(int argc, char **argv)
     uint8_t rom_temp[32768];
     FILE *fp;
 
-    char *bios_name = argv[0];
-    char *cart_name = argv[1];
+    const char *bios_name = argv[0];
+    const char *cart_name = argv[1];
 
     fp = fopen(bios_name, "rb");
     if(fp == NULL) {

@@ -40,6 +40,7 @@ struct system_clock
 
 
 #include "rocinante.h"
+#include "../launcher/launcher.h"
 // #define printf PrintToLine3
 
 clk_t clockRangeStart = 2427489692 - 100000;
@@ -2293,6 +2294,11 @@ extern "C" {
 int apple2_main(int argc, const char **argv);
 };
 
+static int register_app_initializer = []() -> int {
+    LauncherRegisterApp("Apple //e Emulator", "apple2e", "a disk image", "floppies", ".dsk", {"-diskII", "diskII.c600.c6ff.bin"}, {"none", "apple2e.rom"}, apple2_main);
+    LauncherRegisterApp("Apple //e Emulator (no Disk II)", "", "", "", "", {}, {"apple2e.rom"}, apple2_main);
+    return 1;
+}();
 
 int apple2_main(int argc, const char **argv)
 {
