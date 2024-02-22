@@ -67,7 +67,7 @@ tuple<int, string> disassemble_6502(int address, const unsigned char* buffer)
         previousbyte = currentbyte;
         currentbyte = ((unsigned char * ) buffer)[i];
         if (paramcount == 0) {
-            sprintf(p, "%04X   %n", address, &stored);                             //Display current address at beginning of line
+            snprintf(p, cstr + sizeof(cstr) - p, "%04X   %n", address, &stored);                             //Display current address at beginning of line
             p += stored;
             paramcount = opcode_props[currentbyte][0];              //Get instruction length
             bytelength = paramcount;
@@ -80,25 +80,25 @@ tuple<int, string> disassemble_6502(int address, const unsigned char* buffer)
         }
         if (paramcount != 0)                                        //Keep track of possition within instruction
             paramcount = paramcount - 1;
-        sprintf(p, "%02X %n", currentbyte, &stored);                               //Display the current byte in HEX
+        snprintf(p, cstr + sizeof(cstr) - p, "%02X %n", currentbyte, &stored);                               //Display the current byte in HEX
         p += stored;
         if (paramcount == 0) {
-            sprintf(p, " %s %s %s%n", pad, opcode, pre, &stored);                  //Pad text, display instruction name and pre-operand chars
+            snprintf(p, cstr + sizeof(cstr) - p, " %s %s %s%n", pad, opcode, pre, &stored);                  //Pad text, display instruction name and pre-operand chars
             p += stored;
             if (strcmp(pad, "   ") == 0) {                                     //Check if single operand instruction
                 if (addrmode != 8) {                                //If not using relative addressing ...
-                    sprintf(p, "$%02X%n", currentbyte, &stored);                   //...display operand
+                    snprintf(p, cstr + sizeof(cstr) - p, "$%02X%n", currentbyte, &stored);                   //...display operand
                     p += stored;
                 } else {                                            //Addressing mode is relative...
-                    sprintf(p, "$%02X%n", (address + ((currentbyte < 128) ? currentbyte : currentbyte - 256)), &stored); //...display relative address.
+                    snprintf(p, cstr + sizeof(cstr) - p, "$%02X%n", (address + ((currentbyte < 128) ? currentbyte : currentbyte - 256)), &stored); //...display relative address.
                     p += stored;
                 }
             }
             if (strcmp(pad, "") == 0) {                                          //Check if two operand instruction and if so...
-                sprintf(p, "$%02X%02X%n", currentbyte, previousbyte, &stored);     //...display operand
+                snprintf(p, cstr + sizeof(cstr) - p, "$%02X%02X%n", currentbyte, previousbyte, &stored);     //...display operand
                 p += stored;
             }
-            sprintf(p, "%s%n", post, &stored);                                   //Display post-operand chars
+            snprintf(p, cstr + sizeof(cstr) - p, "%s%n", post, &stored);                                   //Display post-operand chars
             p += stored;
             break;
         }

@@ -305,7 +305,7 @@ int main(int argc, const char **argv)
 
         static char progress[512];
         uint32_t tenthousandths = so_far / (file_length / 10000);
-        sprintf(progress, "Decode Progress: %2" PRIu32 ".%02" PRIu32 "%%", static_cast<uint32_t>(tenthousandths / 100), static_cast<uint32_t>(tenthousandths % 100));
+        snprintf(progress, sizeof(progress), "Decode Progress: %2" PRIu32 ".%02" PRIu32 "%%", static_cast<uint32_t>(tenthousandths / 100), static_cast<uint32_t>(tenthousandths % 100));
         RoTextModeSetLine(0, 0, TEXT_NO_ATTRIBUTES, progress);
 
         uint32_t nowTick = RoGetMillis();

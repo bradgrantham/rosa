@@ -437,7 +437,7 @@ struct TMS9918AEmulator
 
             CreateImageAndReturnFlags(registers.data(), memory.data(), pixel_setter);
             char name[512];
-            sprintf(name, "frame_%04" PRIu32 "_%05" PRIu32 "_%d_%02X.ppm", frame_number, write_number, cmd, data);
+            snprintf(name, sizeof(name), "frame_%04" PRIu32 "_%05" PRIu32 "_%d_%02X.ppm", frame_number, write_number, cmd, data);
             FILE *fp = fopen(name, "wb");
             write_rgb8_image_as_P6(framebuffer, SCREEN_X, SCREEN_Y, fp);
             fclose(fp);
@@ -1708,7 +1708,7 @@ void WriteVDPStateToFile(const char *base, int which, const uint8_t* registers, 
 void SaveVDPState(const TMS9918AEmulator *vdp, int which)
 {
     char filename[512];
-    sprintf(filename, "%s_%02d.vdp", getenv("VDP_OUT_BASE"), which);
+    snprintf(filename, sizeof(filename), "%s_%02d.vdp", getenv("VDP_OUT_BASE"), which);
     FILE *vdp_file = fopen(filename, "w");
     WriteVDPStateToFile(getenv("VDP_OUT_BASE"), which, vdp->registers.data(), vdp->memory.data(), vdp_file);
     fclose(vdp_file);

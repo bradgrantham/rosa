@@ -83,7 +83,7 @@ int launcher_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
             const char *suffix = app.suffix.empty() ? NULL : app.suffix.c_str();
 
             status = RoPromptUserToChooseFile(app.what_to_choose.c_str(), app.where_to_choose.c_str(), CHOOSE_FILE_IGNORE_DOTFILES, suffix, &fileChosenInDir);
-            sprintf(fileChosen, "%s/%s", app.where_to_choose.c_str(), fileChosenInDir);
+            snprintf(fileChosen, sizeof(fileChosen), "%s/%s", app.where_to_choose.c_str(), fileChosenInDir);
             if(status == RO_SUCCESS) {
                 args.push_back(fileChosen);
                 for(const auto& lastarg: app.last_args) {

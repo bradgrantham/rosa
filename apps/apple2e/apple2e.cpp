@@ -1613,7 +1613,7 @@ struct MAINboard : board_base
                         sw->enabled = true;
                         if(debug & DEBUG_SWITCH) printf("Set %s\n", sw->name.c_str());
                         post_soft_switch_mode_change();
-                        static char reason[512]; sprintf(reason, "set %s", sw->name.c_str());
+                        static char reason[512]; snprintf(reason, sizeof(reason), "set %s", sw->name.c_str());
                         repage_regions(reason);
                     }
                     return true;
@@ -1624,7 +1624,7 @@ struct MAINboard : board_base
                         sw->enabled = false;
                         if(debug & DEBUG_SWITCH) printf("Clear %s\n", sw->name.c_str());
                         post_soft_switch_mode_change();
-                        static char reason[512]; sprintf(reason, "clear %s", sw->name.c_str());
+                        static char reason[512]; snprintf(reason, sizeof(reason), "clear %s", sw->name.c_str());
                         repage_regions(reason);
                     }
                     return true;
@@ -1861,7 +1861,7 @@ struct MAINboard : board_base
                         sw->enabled = true;
                         if(debug & DEBUG_SWITCH) printf("Set %s\n", sw->name.c_str());
                         post_soft_switch_mode_change();
-                        static char reason[512]; sprintf(reason, "set %s", sw->name.c_str());
+                        static char reason[512]; snprintf(reason, sizeof(reason), "set %s", sw->name.c_str());
                         repage_regions(reason);
                     }
                     return true;
@@ -1872,7 +1872,7 @@ struct MAINboard : board_base
                         sw->enabled = false;
                         if(debug & DEBUG_SWITCH) printf("Clear %s\n", sw->name.c_str());
                         post_soft_switch_mode_change();
-                        static char reason[512]; sprintf(reason, "clear %s", sw->name.c_str());
+                        static char reason[512]; snprintf(reason, sizeof(reason), "clear %s", sw->name.c_str());
                         repage_regions(reason);
                     }
                     return true;
