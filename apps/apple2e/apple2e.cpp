@@ -2320,7 +2320,7 @@ int apple2_main(int argc, const char **argv)
             argc--;
 	} else if(strcmp(argv[0], "-diskII") == 0) {
             if(argc < 4) {
-                fprintf(stderr, "-diskII option requires a ROM image filename and two floppy image names (\"-\" to leave drive empty).\n");
+                fprintf(stderr, "-diskII option requires a ROM image filename and two floppy image names (or \"-\" to leave drive empty).\n");
                 return 1;
             }
             diskII_rom_name = argv[1];
