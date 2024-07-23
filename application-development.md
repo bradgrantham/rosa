@@ -297,9 +297,11 @@ A video mode switch may be requested by an application kit module (like the low-
 
 * Called by Rocinante kernel every frame to determine if scanlines require the colorburst signal.  If colorburst is not provided, a TV or video monitor will typically provide higher resolution and will display only gray pixels.
 
-`void RoNTSCSetMode(int interlaced, RoNTSCModeInitVideoMemoryFunc initFunc, RoNTSCModeFillRowBufferFunc fillBufferFunc, RoNTSCModeNeedsColorburstFunc needsColorBurstFunc);`
+`void RoNTSCSetMode(int interlaced, RoRowConfig row_config, RoNTSCModeInitVideoMemoryFunc initFunc, RoNTSCModeFillRowBufferFunc fillBufferFunc, RoNTSCModeNeedsColorburstFunc needsColorBurstFunc);`
 
-* Request a video mode change
+* Request a video mode change.  `row_config` indicates the scanline sample configuration.
+  * `RO_VIDEO_ROW_SAMPLES_912` specifies 912 samples per scanline including sync and the colorburst, 4 samples per complete colorburst waveform.  This requires the least bandwidth.  As an example, Atari 2600 TIA (228 samples per scanline) and the Apple ][ Woz video circuitry (456 samples in `HGR` and 912 samples in `DHGR`) are best represented in this mode.
+  * `RO_VIDEO_ROW_SAMPLES_1368` specifies 1368 samples per scanline including sync and the colorburst, 6 samples per complete colorburst waveform.  This requires more bandwidth.  The TMS 9918A video output is best represented by this mode.
 
 #### Synchronization to Vertical Retrace
 `extern void RoNTSCWaitFrame(void);`

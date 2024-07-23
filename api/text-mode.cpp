@@ -106,5 +106,5 @@ void RoTextModeSetLine(int row, int column, uint8_t attributes, const char *stri
 
 void RoTextMode()
 {
-    RoNTSCSetMode(0, RoTextModeInitVideoMemory, RoTextModeFillRowBuffer, RoTextModeNeedsColorburst);
+    RoNTSCSetMode(0, RO_VIDEO_ROW_SAMPLES_912, RoTextModeInitVideoMemory, RoTextModeFillRowBuffer, RoTextModeNeedsColorburst);
 }

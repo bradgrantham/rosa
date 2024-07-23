@@ -155,6 +155,11 @@ INLINE int RoDACVoltageToValueFixed16NoBounds(int voltage)
 
 #define NTSC_COLORBURST_FREQUENCY       3579545
 
+typedef enum {
+    RO_VIDEO_ROW_SAMPLES_912 = 1,          // 912 samples, 4 per colorburst cycle
+    RO_VIDEO_ROW_SAMPLES_1368 = 2,         // 1368 samples, 6 per colorburst cycle
+} RoRowConfig;
+
 // Number of samples we target; if we're doing 4x colorburst at 228 cycles, that's 912 samples at 14.318180MHz
 
 #define ROW_SAMPLES        912
@@ -269,7 +274,7 @@ INLINE ntsc_wave_t RoNTSCRGBToWave(float r, float g, float b)
 typedef int (*RoNTSCModeInitVideoMemoryFunc)(void* buffer, uint32_t bufferSize, uint8_t blackvalue, uint8_t whitevalue);
 typedef void (*RoNTSCModeFillRowBufferFunc)(int frameIndex, int rowNumber, size_t maxSamples, uint8_t* rowBuffer);
 typedef int (*RoNTSCModeNeedsColorburstFunc)();
-void RoNTSCSetMode(int interlaced, RoNTSCModeInitVideoMemoryFunc initFunc, RoNTSCModeFillRowBufferFunc fillBufferFunc, RoNTSCModeNeedsColorburstFunc needsColorBurstFunc);
+void RoNTSCSetMode(int interlaced, RoRowConfig row_config, RoNTSCModeInitVideoMemoryFunc initFunc, RoNTSCModeFillRowBufferFunc fillBufferFunc, RoNTSCModeNeedsColorburstFunc needsColorBurstFunc);
 
 extern void RoNTSCWaitFrame(void);
 

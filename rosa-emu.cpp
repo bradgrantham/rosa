@@ -45,9 +45,12 @@ SDL_Window *window;
 SDL_Renderer *renderer;
 SDL_Surface *surface;
 
-const static int SCREEN_X = 704;
-const static int SCREEN_Y = 480;
 const static int SCREEN_SCALE = 1;
+const static int SCREEN_X = 704 * SCREEN_SCALE;
+const static int SCREEN_Y = 480 * SCREEN_SCALE;
+
+int surfaceWidth = 704;
+int surfaceHeight = 480;
 
 void Start(uint32_t& stereoU8SampleRate, size_t& preferredAudioBufferSizeBytes)
 {
@@ -67,7 +70,7 @@ void Start(uint32_t& stereoU8SampleRate, size_t& preferredAudioBufferSizeBytes)
 
 #endif /* EMSCRIPTEN */
 
-    window = SDL_CreateWindow("Rocinante Emulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_X * SCREEN_SCALE, SCREEN_Y * SCREEN_SCALE, SDL_WINDOW_RESIZABLE);
+    window = SDL_CreateWindow("Rocinante Emulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_X, SCREEN_Y, SDL_WINDOW_RESIZABLE);
     if(!window) {
         printf("could not open window\n");
         exit(1);
@@ -77,7 +80,7 @@ void Start(uint32_t& stereoU8SampleRate, size_t& preferredAudioBufferSizeBytes)
         printf("could not create renderer\n");
         exit(1);
     }
-    surface = SDL_CreateRGBSurface(0, SCREEN_X, SCREEN_Y, 24, 0, 0, 0, 0);
+    surface = SDL_CreateRGBSurface(0, surfaceWidth, surfaceHeight, 24, 0, 0, 0, 0);
     if(!surface) {
         printf("could not create surface\n");
         exit(1);
@@ -318,16 +321,17 @@ static void HandleEvents(void)
 }
 
 std::array<float, 4> carrierIQ;
+float carrierOffsetRadians;
 
 void InitColorDecodeTables(float degrees)
 {
-    float theta = (degrees / 360.0f) * M_PI * 2; // [0..359] => [0..Math.PI*2)
+    carrierOffsetRadians = (degrees / 360.0f) * M_PI * 2; // [0..359] => [0..Math.PI*2)
 
     carrierIQ = {
-        sinf(theta),
-        sinf(theta + M_PI / 2),
-        sinf(theta + M_PI),
-        sinf(theta + M_PI * 3 / 2),
+        sinf(carrierOffsetRadians + M_PI / 2.0 * 0.0),
+        sinf(carrierOffsetRadians + M_PI / 2.0 * 1.0),
+        sinf(carrierOffsetRadians + M_PI / 2.0 * 2.0),
+        sinf(carrierOffsetRadians + M_PI / 2.0 * 3.0),
     };
 }
 
@@ -396,42 +400,38 @@ struct Averager
     }
 };
 
+template <int MULTIPLE, int SAMPLES>
 void DecodeColorToRGB(uint8_t *samples, uint8_t *rgb)
 {
     float voltage = RoDACValueToVoltage(samples[0]);
     float value = (voltage - NTSC_SYNC_BLACK_VOLTAGE) / (NTSC_SYNC_WHITE_VOLTAGE - NTSC_SYNC_BLACK_VOLTAGE);
-    Averager<float, 4> value_averaged(value);
-    Averager<float, 4> y_averaged(0);
-    Averager<float, 4> i_averaged(0);
-    Averager<float, 4> q_averaged(0);
+    Averager<float, MULTIPLE> value_averaged(value);
+    Averager<float, MULTIPLE> y_averaged(0);
+    Averager<float, MULTIPLE> i_averaged(0);
+    Averager<float, MULTIPLE> q_averaged(0);
     [[maybe_unused]] float chrominance;
     [[maybe_unused]] float y;
     float i, q;
 
-    for(int idx = 0; idx < 704; idx++) {
-        float saturation;
-
+    for(int idx = 0; idx < SAMPLES; idx++) {
         float voltage = RoDACValueToVoltage(samples[idx]);
         float value = (voltage - NTSC_SYNC_BLACK_VOLTAGE) / (NTSC_SYNC_WHITE_VOLTAGE - NTSC_SYNC_BLACK_VOLTAGE);
         value_averaged.update(value);
 
-        saturation = 0.0;
-        for(int i = 0; i < 4; i++) {
-            float y = value_averaged.at(i);
-            float difference = y - value_averaged; // -1 to 1
-            float magnitude = fabsf(difference); // 0 to 1
-            saturation = std::max(saturation, magnitude);
-        }
-
-        // saturation = std::min(saturation * 2, 1.0f);
-
         y = value_averaged;
         float signal = value - y;
-        i = signal * carrierIQ.at(idx % 4);
-        q = signal * carrierIQ.at((idx + 3) % 4);
+        if(MULTIPLE == 4) {
+            i = signal * carrierIQ.at(idx % MULTIPLE);
+            q = signal * carrierIQ.at((idx + 3) % MULTIPLE); // XXX 3 means -270 degrees out of phase?
+        } else if(MULTIPLE == 6) {
+            i = signal * sinf(carrierOffsetRadians + M_PI / 3.0 * (idx % MULTIPLE));
+            q = signal * sinf(carrierOffsetRadians + M_PI / 3.0 * (idx % MULTIPLE) - M_PI / 2.0);
+        } else {
+            abort(); // XXX should have a specialization or trait or something that would just cause an error here
+        }
         y_averaged.update(y);
-        i_averaged.update(i);
-        q_averaged.update(q);
+        i_averaged.update(i); // XXX This should perform a rotation and manage crossing 0, could interpolate poorly
+        q_averaged.update(q); // XXX This should perform a rotation and manage crossing 0, could interpolate poorly
 
         chrominance = atan2f(q, i) + M_PI; // 0..Math.PI*2
 
@@ -445,6 +445,14 @@ void DecodeColorToRGB(uint8_t *samples, uint8_t *rgb)
     }
 }
 
+// Screen visible sample buffer
+// Sized for 1056 visible row samples
+// If visible row samples is 704, those are "left justified", the remainder of each row is ignored
+const static int SAMPLES_X = 1056;
+const static int SAMPLES_Y = 480;
+uint8_t samples[SAMPLES_X * SAMPLES_Y];
+
+extern RoRowConfig NTSCRowConfig;
 void Frame(unsigned char *samples, bool decodeColor)
 {
     if (SDL_MUSTLOCK(surface)) SDL_LockSurface(surface);
@@ -452,17 +460,44 @@ void Frame(unsigned char *samples, bool decodeColor)
     auto before = std::chrono::system_clock::now();
     uint8_t* framebuffer = reinterpret_cast<uint8_t*>(surface->pixels);
     for(int y = 0; y < 480; y++) {
+        uint8_t *rowpixels = framebuffer + 3 * y * surfaceWidth;
+        uint8_t *rowsamples = samples + y * SAMPLES_X;
+        memset(rowpixels, 0, surfaceWidth * 3);
         if(decodeColor) {
-            uint8_t *rowsamples = samples + y * SCREEN_X;
-            uint8_t *rowpixels = framebuffer + 3 * y * SCREEN_X;
-            DecodeColorToRGB(rowsamples, rowpixels);
+            switch(NTSCRowConfig)
+            {
+                case RO_VIDEO_ROW_SAMPLES_912: {
+                    DecodeColorToRGB<4, 704>(rowsamples, rowpixels);
+                    break;
+                }
+                case RO_VIDEO_ROW_SAMPLES_1368: {
+                    DecodeColorToRGB<6, 1056>(rowsamples, rowpixels);
+                    break;
+                }
+            }
         } else {
-            for(int x = 0; x < 704; x++) {
-                uint8_t *pixel = framebuffer + 3 * (x + y * SCREEN_X);
-                uint8_t *sample = samples + x + y * SCREEN_X;
-                pixel[0] = sample[0];
-                pixel[1] = sample[0];
-                pixel[2] = sample[0];
+            switch(NTSCRowConfig)
+            {
+                case RO_VIDEO_ROW_SAMPLES_912: {
+                    for(int x = 0; x < 704; x++) {
+                        uint8_t *pixel = rowpixels + 3 * x;
+                        uint8_t *sample = rowsamples + x;
+                        pixel[0] = sample[0];
+                        pixel[1] = sample[0];
+                        pixel[2] = sample[0];
+                    }
+                    break;
+                }
+                case RO_VIDEO_ROW_SAMPLES_1368: {
+                    for(int x = 0; x < 1056; x++) {
+                        uint8_t *pixel = rowpixels + 3 * x;
+                        uint8_t *sample = rowsamples + x;
+                        pixel[0] = sample[0];
+                        pixel[1] = sample[0];
+                        pixel[2] = sample[0];
+                    }
+                    break;
+                }
             }
         }
     }
@@ -479,7 +514,9 @@ void Frame(unsigned char *samples, bool decodeColor)
         exit(1);
     }
     SDL_RenderClear(renderer);
-    SDL_RenderCopy(renderer, texture, NULL, NULL);
+    // SDL_Rect srcrect { 0, 0, surfaceWidth, surfaceHeight };
+    // SDL_Rect dstrect { 0, 0, SCREEN_X, SCREEN_Y };
+    SDL_RenderCopy(renderer, texture, nullptr, nullptr); // &srcrect, &dstrect);
     SDL_RenderPresent(renderer);
     SDL_DestroyTexture(texture);
     after = std::chrono::system_clock::now();
@@ -498,8 +535,6 @@ void caller(void *f_)
     }
 }
 #endif /* EMSCRIPTEN */ 
-
-uint8_t samples[SCREEN_X * SCREEN_Y];
 
 void RoDebugOverlayPrintf(const char *fmt, ...)
 {
@@ -636,11 +671,33 @@ RoNTSCModeFillRowBufferFunc NTSCModeFillRowBuffer;
 RoNTSCModeNeedsColorburstFunc NTSCModeNeedsColorburst;
 bool NTSCModeInterlaced = false;
 uint8_t VideoMemoryBuffer[65536];
+// RO_VIDEO_ROW_SAMPLES_912 = 1,          // 912 samples, 4 per colorburst cycle
+// RO_VIDEO_ROW_SAMPLES_1368 = 2,         // 1368 samples, 6 per colorburst cycle
+RoRowConfig NTSCRowConfig;
 
-void RoNTSCSetMode(int interlaced_, RoNTSCModeInitVideoMemoryFunc initFunc, RoNTSCModeFillRowBufferFunc fillBufferFunc_, RoNTSCModeNeedsColorburstFunc needsColorBurstFunc_)
+void RoNTSCSetMode(int interlaced_, RoRowConfig row_config, RoNTSCModeInitVideoMemoryFunc initFunc, RoNTSCModeFillRowBufferFunc fillBufferFunc_, RoNTSCModeNeedsColorburstFunc needsColorBurstFunc_)
 {
     // XXX Need to lock here versus any threaded access to these variables
     NTSCModeFuncsValid = false;
+
+    NTSCRowConfig = row_config;
+    SDL_FreeSurface(surface);
+    switch(NTSCRowConfig)
+    {
+        case RO_VIDEO_ROW_SAMPLES_912: {
+            surfaceWidth = 704;
+            break;
+        }
+        case RO_VIDEO_ROW_SAMPLES_1368: {
+            surfaceWidth = 1056;
+            break;
+        }
+    }
+    surface = SDL_CreateRGBSurface(0, surfaceWidth, surfaceHeight, 24, 0, 0, 0, 0);
+    if(!surface) {
+        printf("could not create surface\n");
+        exit(1);
+    }
 
     NTSCModeFillRowBuffer = fillBufferFunc_;
     NTSCModeNeedsColorburst = needsColorBurstFunc_;
@@ -712,16 +769,38 @@ int RoDoHousekeeping(void)
         if(NTSCModeInterlaced) {
             for(int lineNumber = 0; lineNumber < 480; lineNumber++) {
                 if(NTSCModeFuncsValid) {
-                    memset(samples + lineNumber * 704, 86, 704);
-                    NTSCModeFillRowBuffer(0, lineNumber, 704, samples + lineNumber * 704);
+                    uint8_t *rowsamples = samples + lineNumber * SAMPLES_X;
+                    memset(rowsamples, 86, SAMPLES_X);
+                    switch(NTSCRowConfig)
+                    {
+                        case RO_VIDEO_ROW_SAMPLES_912: {
+                            NTSCModeFillRowBuffer(0, lineNumber, 704, rowsamples);
+                            break;
+                        }
+                        case RO_VIDEO_ROW_SAMPLES_1368: {
+                            NTSCModeFillRowBuffer(0, lineNumber, 1056, rowsamples);
+                            break;
+                        }
+                    }
                 }
             }
         } else {
             for(int lineNumber = 0; lineNumber < 240; lineNumber++) {
                 if(NTSCModeFuncsValid) {
-                    memset(samples + (lineNumber * 2 + 0) * 704, 86, 704);
-                    NTSCModeFillRowBuffer(0, lineNumber, 704, samples + (lineNumber * 2 + 0) * 704);
-                    memcpy(samples + (lineNumber * 2 + 1) * 704, samples + (lineNumber * 2 + 0) * 704, 704);
+                    uint8_t *rowsamples = samples + (lineNumber * 2 + 0) * SAMPLES_X;
+                    memset(rowsamples, 86, SAMPLES_X);
+                    switch(NTSCRowConfig)
+                    {
+                        case RO_VIDEO_ROW_SAMPLES_912: {
+                            NTSCModeFillRowBuffer(0, lineNumber, 704, rowsamples);
+                            break;
+                        }
+                        case RO_VIDEO_ROW_SAMPLES_1368: {
+                            NTSCModeFillRowBuffer(0, lineNumber, 1056, rowsamples);
+                            break;
+                        }
+                    }
+                    memcpy(rowsamples + SAMPLES_X, rowsamples, SAMPLES_X);
                 }
             }
         }
@@ -748,6 +827,7 @@ extern "C" {
     wrap elapsed time around Frame(samples)
     implement EventPoll
     implement DebugOverlay
+    Implement some kind of scaling for RO_VIDEO_ROW_SAMPLES_1368 - aspect ratio is wrong
 */
 
 void usage(const char *progname) 

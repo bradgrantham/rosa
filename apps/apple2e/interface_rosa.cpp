@@ -553,7 +553,7 @@ static int WozModeInitVideoMemory(void *videoMemory, uint32_t size, uint8_t blac
 
 void start(bool, bool, bool, bool)
 {
-    RoNTSCSetMode(0, WozModeInitVideoMemory, WozModeFillRowBuffer, WozModeNeedsColorburst);
+    RoNTSCSetMode(0, RO_VIDEO_ROW_SAMPLES_912, WozModeInitVideoMemory, WozModeFillRowBuffer, WozModeNeedsColorburst);
     RoAudioGetSamplingInfo(&audioSampleRate, &audioChunkLengthBytes);
     RoKeyRepeatInit(&keyRepeat);
     event_queue.push_back({KEYDOWN, CAPS_LOCK});

@@ -543,7 +543,7 @@ int trs80_main([[maybe_unused]] int argc, [[maybe_unused]] const char **argv)
     Trs80Machine *machine = new Trs80Machine;
 
     // Set up the display.
-    RoNTSCSetMode(0, Trs80TextModeInitVideoMemory, Trs80TextModeFillRowBuffer, Trs80TextModeNeedsColorburst);
+    RoNTSCSetMode(0, RO_VIDEO_ROW_SAMPLES_912, Trs80TextModeInitVideoMemory, Trs80TextModeFillRowBuffer, Trs80TextModeNeedsColorburst);
 #if 0
     // For when debugging the character set.
     for (int i = 0; i < 256; i++) {

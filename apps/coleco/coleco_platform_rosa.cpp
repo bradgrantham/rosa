@@ -18,17 +18,14 @@ namespace PlatformInterface
 //----------------------------------------------------------------------------
 // 4-bit 256x192 pixmap mode, can support rasterized TMS9918 screen
 
-/* actually 682.6_ 14MHz clocks because 5.3MHz TMS9918A pixel clock */
-/* so the last pixel is extended another 1/3 to fill last clock */
-#define Pixmap256_192_4b_MODE_WIDTH 512
-#define Pixmap256_192_4b_MODE_LEFT ((704 - Pixmap256_192_4b_MODE_WIDTH) / 2) 
-// 65 
+#define Pixmap256_192_4b_MODE_WIDTH 768
+#define Pixmap256_192_4b_MODE_LEFT ((1056 - Pixmap256_192_4b_MODE_WIDTH) / 2) 
 #define Pixmap256_192_4b_MODE_HEIGHT 192 
 #define Pixmap256_192_4b_MODE_TOP (240 / 2 - Pixmap256_192_4b_MODE_HEIGHT / 2);
 
 uint8_t *Pixmap256_192_4b_Framebuffer;
 
-uint8_t Pixmap256_192_4b_ColorsToNTSC[16][4];
+uint8_t Pixmap256_192_4b_ColorsToNTSC[16][6];
 
 // XXX TODO: convert original patent waveforms into YIQ
 // May not be able to get the real YIQ values because resistor
@@ -38,10 +35,9 @@ void Pixmap256_192_4b_SetPaletteEntry(int color, uint8_t r, uint8_t g, uint8_t b
     float y, i, q;
     RoRGBToYIQ(r / 255.0f, g / 255.0f, b / 255.0f, &y, &i, &q);
 
-    Pixmap256_192_4b_ColorsToNTSC[color][0] = RoNTSCYIQToDAC(y, i, q,  .0f);
-    Pixmap256_192_4b_ColorsToNTSC[color][1] = RoNTSCYIQToDAC(y, i, q, .25f);
-    Pixmap256_192_4b_ColorsToNTSC[color][2] = RoNTSCYIQToDAC(y, i, q, .50f);
-    Pixmap256_192_4b_ColorsToNTSC[color][3] = RoNTSCYIQToDAC(y, i, q, .75f);
+    for(int phase = 0; phase < 6; phase++) {
+        Pixmap256_192_4b_ColorsToNTSC[color][phase] = RoNTSCYIQToDAC(y, i, q, phase / 6.0);
+    }
 }
 
 uint8_t Pixmap256_192_4b_GetColorIndex(int x, uint8_t *rowColors)
@@ -84,10 +80,11 @@ __attribute__((hot,flatten)) void Pixmap256_192_4b_ModeFillRowBuffer([[maybe_unu
         uint16_t index = Pixmap256_192_4b_MODE_LEFT;
 
         for(int i = 0; i < 255; i++) {
-            uint8_t *color = Pixmap256_192_4b_ColorsToNTSC[Pixmap256_192_4b_GetColorIndex(i, rowColors)];
-            rowBuffer[index + 0] = color[(index + 0) % 4];
-            rowBuffer[index + 1] = color[(index + 1) % 4];
-            index += 2;
+            uint8_t *color = Pixmap256_192_4b_ColorsToNTSC[Pixmap256_192_4b_GetColorIndex(i, rowColors)] ;
+            rowBuffer[index + 0] = color[(index + 0) % 6];
+            rowBuffer[index + 1] = color[(index + 1) % 6];
+            rowBuffer[index + 2] = color[(index + 2) % 6];
+            index += 3;
         }
     }
 }
@@ -201,7 +198,7 @@ void Start(uint32_t& stereoU8SampleRate_, size_t& preferredAudioBufferSizeBytes_
         const uint8_t *c = TMS9918A::Colors[i];
         Pixmap256_192_4b_SetPaletteEntry(i, c[0], c[1], c[2]);
     }
-    RoNTSCSetMode(0, Pixmap256_192_4b_ModeInitVideoMemory, Pixmap256_192_4b_ModeFillRowBuffer, Pixmap256_192_4b_ModeNeedsColorburst);
+    RoNTSCSetMode(0, RO_VIDEO_ROW_SAMPLES_1368, Pixmap256_192_4b_ModeInitVideoMemory, Pixmap256_192_4b_ModeFillRowBuffer, Pixmap256_192_4b_ModeNeedsColorburst);
 
     RoAudioGetSamplingInfo(&audioSampleRate, &audioChunkLengthBytes);
     stereoU8SampleRate_ = audioSampleRate;
