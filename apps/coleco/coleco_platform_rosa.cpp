@@ -69,22 +69,28 @@ static int Pixmap256_192_4b_ModeInitVideoMemory(void *videoMemory, uint32_t size
     return 1; // XXX should return 0 here if memory insufficient
 }
 
-
 __attribute__((hot,flatten)) void Pixmap256_192_4b_ModeFillRowBuffer([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
     int rowIndex = rowNumber - Pixmap256_192_4b_MODE_TOP;
     if((rowIndex >= 0) && (rowIndex < 192)) {
         uint8_t* rowColors = Pixmap256_192_4b_Framebuffer + rowIndex * 128;
 
-        // convert rowColors to NTSC waveform into rowDst 2 2/3 samples at a time.  8-|
-        uint16_t index = Pixmap256_192_4b_MODE_LEFT;
+        // convert rowColors to NTSC waveform into rowDst 3 samples at a time.
+        rowBuffer += Pixmap256_192_4b_MODE_LEFT;
 
-        for(int i = 0; i < 255; i++) {
-            uint8_t *color = Pixmap256_192_4b_ColorsToNTSC[Pixmap256_192_4b_GetColorIndex(i, rowColors)] ;
-            rowBuffer[index + 0] = color[(index + 0) % 6];
-            rowBuffer[index + 1] = color[(index + 1) % 6];
-            rowBuffer[index + 2] = color[(index + 2) % 6];
-            index += 3;
+        // two at a time
+        for(int i = 0; i < 256; i += 2) {
+            uint8_t fb_byte = *rowColors++;
+            uint8_t nybble = fb_byte & 0xF;
+            uint8_t *color = Pixmap256_192_4b_ColorsToNTSC[nybble];
+            *rowBuffer++ = color[0];
+            *rowBuffer++ = color[1];
+            *rowBuffer++ = color[2];
+            nybble = fb_byte >> 4;
+            color = Pixmap256_192_4b_ColorsToNTSC[nybble];
+            *rowBuffer++ = color[3];
+            *rowBuffer++ = color[4];
+            *rowBuffer++ = color[5];
         }
     }
 }
@@ -132,6 +138,8 @@ uint8_t keyboard_1_joystick_state = 0;
 uint8_t keyboard_2_joystick_state = 0;
 uint8_t keyboard_1_keypad_state = 0;
 uint8_t keyboard_2_keypad_state = 0;
+
+bool save_next_screen = false;
 
 uint8_t GetJoystickState(ControllerIndex controller)
 {
@@ -225,6 +233,9 @@ void ProcessKey(int press, int key)
                 break;
             case KEYCAP_RIGHTSHIFT:
                 right_shift_pressed = true;
+                break;
+            case KEYCAP_P:
+                save_next_screen = true;
                 break;
             case KEYCAP_W:
                 set_bits(keyboard_1_joystick_state, CONTROLLER1_NORTH_BIT);
@@ -417,6 +428,19 @@ void Frame(const uint8_t* vdp_registers, const uint8_t* vdp_ram, uint8_t& vdp_st
 
     RoNTSCWaitFrame();
     vdp_status_result = TMS9918A::Create4BitPixmap(vdp_registers, vdp_ram, Pixmap256_192_4b_Framebuffer);
+    if(save_next_screen)
+    {
+        char filename[512];
+        snprintf(filename, sizeof(filename), "vdp_screen_%ld.bin", time(0));
+        FILE *out = fopen(filename, "wb");
+        if(out == nullptr)
+        {
+            printf("failed to open \"%s\"\n", filename);
+        }
+        fwrite(Pixmap256_192_4b_Framebuffer, 256 * 192 / 2, 1, out);
+        fclose(out);
+        save_next_screen = false;
+    }
     start_of_frame = std::chrono::system_clock::now();
 }
 
