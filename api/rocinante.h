@@ -162,7 +162,6 @@ typedef enum {
 
 // Number of samples we target; if we're doing 4x colorburst at 228 cycles, that's 912 samples at 14.318180MHz
 
-#define ROW_SAMPLES        912
 #define NTSC_EQPULSE_LINES	3
 #define NTSC_VSYNC_LINES	3
 #define NTSC_VBLANK_LINES	11
