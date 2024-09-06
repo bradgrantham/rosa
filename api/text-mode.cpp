@@ -1,3 +1,4 @@
+#include <new>
 #include <cstring>
 #include <cassert>
 #include "rocinante.h"
@@ -26,23 +27,32 @@ void RoTextModeClearDisplay()
     memset(TextModeAttributes, TEXT_NO_ATTRIBUTES, TextModeWidth * TextModeHeight);
 }
 
-int RoTextModeInitVideoMemory(void *videoMemory, uint32_t size, uint8_t black, uint8_t white)
+static int RoTextModeInit([[maybe_unused]] void *private_data, uint8_t black, uint8_t white)
 {
-    auto reserve = [](void*& ptr, uint32_t& remaining, size_t rsv) {
-        void *old = ptr;
-        assert(remaining >= rsv);
-        ptr = static_cast<uint8_t*>(ptr) + rsv;
-        remaining -= rsv;
-        return old;
-    };
-
-    TextModeAttributes = static_cast<uint8_t*>(reserve(videoMemory, size, TextModeHeight * TextModeWidth));
-    TextModeBuffer = static_cast<char*>(reserve(videoMemory, size, TextModeHeight * TextModeWidth));
+    TextModeAttributes = new(std::nothrow) uint8_t[TextModeHeight * TextModeWidth];
+    if(TextModeAttributes == nullptr)
+    {
+        // out of memory
+        return 0;
+    }
+    TextModeBuffer = new (std::nothrow) char[TextModeHeight * TextModeWidth];
+    if(TextModeBuffer == nullptr)
+    {
+        delete[] TextModeAttributes;
+        // out of memory
+        return 0;
+    }
     NTSCBlack = black;
     NTSCWhite = white;
     RoTextModeClearDisplay();
 
-    return 1; // XXX should return 0 here if memory insufficient
+    return 1;
+}
+
+static void RoTextModeFini([[maybe_unused]] void *private_data)
+{
+    delete[] TextModeAttributes;
+    delete[] TextModeBuffer;
 }
 
 __attribute__((hot,flatten)) void RoTextModeFillRowBuffer([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
@@ -106,5 +116,5 @@ void RoTextModeSetLine(int row, int column, uint8_t attributes, const char *stri
 
 void RoTextMode()
 {
-    RoNTSCSetMode(0, RO_VIDEO_ROW_SAMPLES_912, RoTextModeInitVideoMemory, RoTextModeFillRowBuffer, RoTextModeNeedsColorburst);
+    RoNTSCSetMode(0, RO_VIDEO_ROW_SAMPLES_912, nullptr, RoTextModeInit, RoTextModeFini, RoTextModeFillRowBuffer, RoTextModeNeedsColorburst);
 }

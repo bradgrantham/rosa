@@ -150,22 +150,11 @@ static char *TextModeBuffer;
 static uint8_t NTSCBlack, NTSCWhite;
 
 // Called by the system to initialize our video memory.
-static int Trs80TextModeInitVideoMemory(void *videoMemory, uint32_t size,
+static int Trs80TextModeInit([[maybe_unused]] void *private_data,
         uint8_t black, uint8_t white)
 {
-    auto reserve = [](void*& ptr, uint32_t& remaining, size_t rsv) {
-        void *old = ptr;
-        if (remaining < rsv) {
-            // Out of memory.
-            return (void *) 0;
-        }
-        ptr = static_cast<uint8_t*>(ptr) + rsv;
-        remaining -= rsv;
-        return old;
-    };
-
-    TextModeBuffer = static_cast<char*>(reserve(videoMemory, size, Trs80RowCount * Trs80ColumnCount));
-    if (TextModeBuffer == 0) {
+    TextModeBuffer = new(std::nothrow) char[Trs80RowCount * Trs80ColumnCount];
+    if (TextModeBuffer == nullptr) {
         // Out of memory.
         return 0;
     }
@@ -173,6 +162,11 @@ static int Trs80TextModeInitVideoMemory(void *videoMemory, uint32_t size,
     NTSCWhite = white;
 
     return 1;
+}
+
+static void Trs80TextModeFini([[maybe_unused]] void *private_data)
+{
+    delete[] TextModeBuffer;
 }
 
 // Called by the system to get the next row of video.
@@ -543,7 +537,7 @@ int trs80_main([[maybe_unused]] int argc, [[maybe_unused]] const char **argv)
     Trs80Machine *machine = new Trs80Machine;
 
     // Set up the display.
-    RoNTSCSetMode(0, RO_VIDEO_ROW_SAMPLES_912, Trs80TextModeInitVideoMemory, Trs80TextModeFillRowBuffer, Trs80TextModeNeedsColorburst);
+    RoNTSCSetMode(0, RO_VIDEO_ROW_SAMPLES_912, nullptr, Trs80TextModeInit, Trs80TextModeFini, Trs80TextModeFillRowBuffer, Trs80TextModeNeedsColorburst);
 #if 0
     // For when debugging the character set.
     for (int i = 0; i < 256; i++) {

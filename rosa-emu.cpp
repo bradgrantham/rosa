@@ -44,7 +44,6 @@ void EnqueueStereoU8AudioSamples(uint8_t *buf, size_t sz)
 SDL_Window *window;
 SDL_Renderer *renderer;
 SDL_Surface *surface;
-
 const static int SCREEN_SCALE = 1;
 const static int SCREEN_X = 704 * SCREEN_SCALE;
 const static int SCREEN_Y = 480 * SCREEN_SCALE;
@@ -459,7 +458,7 @@ void Frame(unsigned char *samples, bool decodeColor)
 
     auto before = std::chrono::system_clock::now();
     uint8_t* framebuffer = reinterpret_cast<uint8_t*>(surface->pixels);
-    for(int y = 0; y < 480; y++) {
+    for(int y = 0; y < surfaceHeight; y++) {
         uint8_t *rowpixels = framebuffer + 3 * y * surfaceWidth;
         uint8_t *rowsamples = samples + y * SAMPLES_X;
         memset(rowpixels, 0, surfaceWidth * 3);
@@ -667,15 +666,16 @@ uint8_t RoGetKeypadState(RoControllerIndex which)
 }
 
 bool NTSCModeFuncsValid = false;
+void* NTSCModePrivateData;
+RoNTSCModeFiniFunc NTSCModeFinalize;
 RoNTSCModeFillRowBufferFunc NTSCModeFillRowBuffer;
 RoNTSCModeNeedsColorburstFunc NTSCModeNeedsColorburst;
 bool NTSCModeInterlaced = false;
-uint8_t VideoMemoryBuffer[65536];
 // RO_VIDEO_ROW_SAMPLES_912 = 1,          // 912 samples, 4 per colorburst cycle
 // RO_VIDEO_ROW_SAMPLES_1368 = 2,         // 1368 samples, 6 per colorburst cycle
 RoRowConfig NTSCRowConfig;
 
-void RoNTSCSetMode(int interlaced_, RoRowConfig row_config, RoNTSCModeInitVideoMemoryFunc initFunc, RoNTSCModeFillRowBufferFunc fillBufferFunc_, RoNTSCModeNeedsColorburstFunc needsColorBurstFunc_)
+void RoNTSCSetMode(int interlaced_, RoRowConfig row_config, void* private_data, RoNTSCModeInitFunc initFunc, RoNTSCModeFiniFunc finiFunc_, RoNTSCModeFillRowBufferFunc fillBufferFunc_, RoNTSCModeNeedsColorburstFunc needsColorBurstFunc_)
 {
     // XXX Need to lock here versus any threaded access to these variables
     NTSCModeFuncsValid = false;
@@ -699,12 +699,19 @@ void RoNTSCSetMode(int interlaced_, RoRowConfig row_config, RoNTSCModeInitVideoM
         exit(1);
     }
 
+    if(NTSCModeFinalize != nullptr)
+    {
+        NTSCModeFinalize(NTSCModePrivateData);
+    }
+
+    NTSCModeFinalize = finiFunc_;
+    NTSCModePrivateData = private_data;
     NTSCModeFillRowBuffer = fillBufferFunc_;
     NTSCModeNeedsColorburst = needsColorBurstFunc_;
     NTSCModeInterlaced = interlaced_;
 
     /* Should black and white be similar to HW values to exercise reduced precision? */
-    [[maybe_unused]] int result = initFunc(VideoMemoryBuffer, sizeof(VideoMemoryBuffer), 0, 255);
+    [[maybe_unused]] int result = initFunc(private_data, 0, 255);
     assert(result == 1);
 
     NTSCModeFuncsValid = true;
@@ -767,7 +774,7 @@ int RoDoHousekeeping(void)
         last_frame_processing = now;
         auto caliper_start = std::chrono::system_clock::now();
         if(NTSCModeInterlaced) {
-            for(int lineNumber = 0; lineNumber < 480; lineNumber++) {
+            for(int lineNumber = 0; lineNumber < surfaceHeight; lineNumber++) {
                 if(NTSCModeFuncsValid) {
                     uint8_t *rowsamples = samples + lineNumber * SAMPLES_X;
                     memset(rowsamples, 86, SAMPLES_X);

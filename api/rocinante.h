@@ -270,10 +270,11 @@ INLINE ntsc_wave_t RoNTSCRGBToWave(float r, float g, float b)
     return RoNTSCYIQToWave(y, i, q);
 }
 
-typedef int (*RoNTSCModeInitVideoMemoryFunc)(void* buffer, uint32_t bufferSize, uint8_t blackvalue, uint8_t whitevalue);
+typedef int (*RoNTSCModeInitFunc)(void* private_data, uint8_t blackvalue, uint8_t whitevalue);
+typedef void (*RoNTSCModeFiniFunc)(void* private_data);
 typedef void (*RoNTSCModeFillRowBufferFunc)(int frameIndex, int rowNumber, size_t maxSamples, uint8_t* rowBuffer);
 typedef int (*RoNTSCModeNeedsColorburstFunc)();
-void RoNTSCSetMode(int interlaced, RoRowConfig row_config, RoNTSCModeInitVideoMemoryFunc initFunc, RoNTSCModeFillRowBufferFunc fillBufferFunc, RoNTSCModeNeedsColorburstFunc needsColorBurstFunc);
+void RoNTSCSetMode(int interlaced, RoRowConfig row_config, void* privateData, RoNTSCModeInitFunc initFunc, RoNTSCModeFiniFunc finiFunc, RoNTSCModeFillRowBufferFunc fillBufferFunc, RoNTSCModeNeedsColorburstFunc needsColorBurstFunc);
 
 extern void RoNTSCWaitFrame(void);
 

@@ -66,6 +66,7 @@ void WozModeClearFlags()
     WozModeVid80 = 0;
     WozModeDHGR = 0;
 }
+
 // indexed by aux, then by page, then by buffer address in scan order, not in Apple ][ memory order
 typedef uint8_t WozModeHGRBuffers_t[2][7680];
 typedef uint8_t WozModeTextBuffers_t[2][960];
@@ -533,27 +534,36 @@ tuple<float,bool> get_paddle(int num)
     return make_tuple(0, false);
 }
 
-static int WozModeInitVideoMemory(void *videoMemory, uint32_t size, uint8_t black, uint8_t white)
+static int WozModeInit([[maybe_unused]] void *private_data, uint8_t black, uint8_t white)
 {
-    auto reserve = [](void*& ptr, uint32_t& remaining, size_t rsv) {
-        void *old = ptr;
-        assert(remaining >= rsv);
-        ptr = static_cast<uint8_t*>(ptr) + rsv;
-        remaining -= rsv;
-        return old;
-    };
-
-    WozModeHGRBuffers = static_cast<WozModeHGRBuffers_t*>(reserve(videoMemory, size, 2 * sizeof(WozModeHGRBuffers_t)));
-    WozModeTextBuffers = static_cast<WozModeTextBuffers_t*>(reserve(videoMemory, size, 2 * sizeof(WozModeTextBuffers_t)));
+    WozModeHGRBuffers = new(std::nothrow) WozModeHGRBuffers_t[2]; // Main and Aux versions of buffers
+    if(WozModeHGRBuffers == nullptr)
+    {
+        // out of memory
+        return 0;
+    }
+    WozModeTextBuffers = new(std::nothrow) WozModeTextBuffers_t[2]; // Main and Aux versions of buffers
+    if(WozModeHGRBuffers == nullptr)
+    {
+        // out of memory
+        delete[] WozModeHGRBuffers;
+        return 0;
+    }
     NTSCBlack = black;
     NTSCWhite = white;
 
-    return 1; // XXX should return 0 here if memory insufficient
+    return 1;
+}
+
+static void WozModeFini([[maybe_unused]] void *private_data)
+{
+    delete[] WozModeHGRBuffers;
+    delete[] WozModeTextBuffers;
 }
 
 void start(bool, bool, bool, bool)
 {
-    RoNTSCSetMode(0, RO_VIDEO_ROW_SAMPLES_912, WozModeInitVideoMemory, WozModeFillRowBuffer, WozModeNeedsColorburst);
+    RoNTSCSetMode(0, RO_VIDEO_ROW_SAMPLES_912, nullptr, WozModeInit, WozModeFini, WozModeFillRowBuffer, WozModeNeedsColorburst);
     RoAudioGetSamplingInfo(&audioSampleRate, &audioChunkLengthBytes);
     RoKeyRepeatInit(&keyRepeat);
     event_queue.push_back({KEYDOWN, CAPS_LOCK});
