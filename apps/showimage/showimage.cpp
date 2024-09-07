@@ -266,83 +266,79 @@ int main([[maybe_unused]] int argc, const char **argv)
         exit(1);
     }
 
-    int prevY = -1;
-    for(int srcRow = 0; srcRow < height; srcRow++) {
+    int prevImageRow = -1;
+    for(int y = 0; y < VIDEO_4_BIT_MODE_HEIGHT; y++)
+    {
+        int srcRow = y * height / VIDEO_4_BIT_MODE_HEIGHT;
 
-        if(ppmtype == 6) {
-            if(fread(rowRGB, 3, width, fp) != (size_t)width) {
-                printf("ERROR: couldn't read row %d from \"%s\"\n", srcRow, filename);
-                free(palette);
-                free(rowError);
-                free(rowRGB);
-                exit(1);
+        while (prevImageRow < srcRow) {
+            if(ppmtype == 6) {
+                if(fread(rowRGB, 3, width, fp) != (size_t)width) {
+                    printf("ERROR: couldn't read row %d from \"%s\"\n", srcRow, filename);
+                    free(palette);
+                    free(rowError);
+                    free(rowRGB);
+                    exit(1);
+                }
+            } else if(ppmtype == 5) {
+                if(fread(rowRGB, 1, width, fp) != (size_t)width) {
+                    printf("ERROR: couldn't read row %d from \"%s\"\n", srcRow, filename);
+                    free(palette);
+                    free(rowError);
+                    free(rowRGB);
+                    exit(1);
+                }
+                // expand P5 row to P6 RGB
+                for(int i = 0; i < width; i++) {
+                    int x = width - 1 - i;
+                    unsigned char gray = ((unsigned char *)rowRGB)[x];
+                    rowRGB[x][0] = gray;
+                    rowRGB[x][1] = gray;
+                    rowRGB[x][2] = gray;
+                }
             }
-        } else if(ppmtype == 5) {
-            if(fread(rowRGB, 1, width, fp) != (size_t)width) {
-                printf("ERROR: couldn't read row %d from \"%s\"\n", srcRow, filename);
-                free(palette);
-                free(rowError);
-                free(rowRGB);
-                exit(1);
-            }
-            // expand P5 row to P6 RGB
-            for(int i = 0; i < width; i++) {
-                int x = width - 1 - i;
-                unsigned char gray = ((unsigned char *)rowRGB)[x];
-                rowRGB[x][0] = gray;
-                rowRGB[x][1] = gray;
-                rowRGB[x][2] = gray;
-            }
+            prevImageRow++;
         }
 
-        int y = (srcRow * VIDEO_4_BIT_MODE_HEIGHT + VIDEO_4_BIT_MODE_HEIGHT - 1) / height;
+        short (*errorThisRowFixed8)[3] = rowError[currentErrorRow] + 1; // So we can access -1 without bounds check
 
-        if(y != prevY) {
+        int nextErrorRow = (currentErrorRow + 1) % 2;
+        memset(rowError[nextErrorRow], 0, sizeof(rowError[0]));
+        short (*errorNextRowFixed8)[3] = rowError[nextErrorRow] + 1;   // So we can access -1 without bounds check
 
-            if(y >= VIDEO_4_BIT_MODE_HEIGHT) {
-                printf("hm, y was >= height, skipped\n");
+        for(int x = 0; x < VIDEO_4_BIT_MODE_WIDTH_PIXELS; x++) {
+            int srcCol = (x * width + width - 1) / VIDEO_4_BIT_MODE_WIDTH_PIXELS;
+
+            // get the color with error diffused from previous pixels
+            int correctedRGB[3];
+            for(int i = 0; i < 3; i++) {
+                 correctedRGB[i] = rowRGB[srcCol][i] + errorThisRowFixed8[x][i] / 256;
             }
 
-            short (*errorThisRowFixed8)[3] = rowError[currentErrorRow] + 1; // So we can access -1 without bounds check
+            // Find the closest color in our palette
+            int c = FindClosestColor(palette, paletteSize, correctedRGB[0], correctedRGB[1], correctedRGB[2]);
 
-            int nextErrorRow = (currentErrorRow + 1) % 2;
-            memset(rowError[nextErrorRow], 0, sizeof(rowError[0]));
-            short (*errorNextRowFixed8)[3] = rowError[nextErrorRow] + 1;   // So we can access -1 without bounds check
+            SetPixel(x, y, c);
 
-            for(int x = 0; x < VIDEO_4_BIT_MODE_WIDTH_PIXELS; x++) {
-                int srcCol = (x * width + width - 1) / VIDEO_4_BIT_MODE_WIDTH_PIXELS;
-
-                // get the color with error diffused from previous pixels
-                int correctedRGB[3];
-                for(int i = 0; i < 3; i++) {
-                     correctedRGB[i] = rowRGB[srcCol][i] + errorThisRowFixed8[x][i] / 256;
-                }
-
-                // Find the closest color in our palette
-                int c = FindClosestColor(palette, paletteSize, correctedRGB[0], correctedRGB[1], correctedRGB[2]);
-
-                SetPixel(x, y, c);
-
-                // Calculate our error between what we wanted and what we got
-                // and distribute it a la Floyd-Steinberg
-                int errorFixed8[3];
-                for(int i = 0; i < 3; i++) {
-                    errorFixed8[i] = 255 * (correctedRGB[i] - palette[c][i]);
-                }
-                for(int i = 0; i < 3; i++) {
-                    errorThisRowFixed8[x + 1][i] += errorFixed8[i] * 7 / 16;
-                }
-                for(int i = 0; i < 3; i++) {
-                    errorNextRowFixed8[x - 1][i] += errorFixed8[i] * 3 / 16;
-                }
-                for(int i = 0; i < 3; i++) {
-                    errorNextRowFixed8[x    ][i] += errorFixed8[i] * 5 / 16;
-                }
-                for(int i = 0; i < 3; i++) {
-                    errorNextRowFixed8[x + 1][i] += errorFixed8[i] * 1 / 16;
-                }
+            // Calculate our error between what we wanted and what we got
+            // and distribute it a la Floyd-Steinberg
+            int errorFixed8[3];
+            for(int i = 0; i < 3; i++) {
+                errorFixed8[i] = 255 * (correctedRGB[i] - palette[c][i]);
             }
-            prevY = y;
+            for(int i = 0; i < 3; i++) {
+                errorThisRowFixed8[x + 1][i] += errorFixed8[i] * 7 / 16;
+            }
+            for(int i = 0; i < 3; i++) {
+                errorNextRowFixed8[x - 1][i] += errorFixed8[i] * 3 / 16;
+            }
+            for(int i = 0; i < 3; i++) {
+                errorNextRowFixed8[x    ][i] += errorFixed8[i] * 5 / 16;
+            }
+            for(int i = 0; i < 3; i++) {
+                errorNextRowFixed8[x + 1][i] += errorFixed8[i] * 1 / 16;
+            }
+
             currentErrorRow = nextErrorRow;
         }
     }
