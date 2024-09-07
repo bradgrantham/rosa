@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <string>
 #include <vector>
+#include <cstring>
 #include "rocinante.h"
 #include "events.h"
 #include "ui.h"
