@@ -25,45 +25,56 @@ static int initializer = []() -> int {
 //----------------------------------------------------------------------------
 // 4-bit 352x384 pixmap mode
 
-#define VIDEO_4_BIT_MODE_WIDTH_SAMPLES 704
-#define VIDEO_4_BIT_MODE_WIDTH_PIXELS (VIDEO_4_BIT_MODE_WIDTH_SAMPLES / 2)
-#define VIDEO_4_BIT_MODE_ROWBYTES (VIDEO_4_BIT_MODE_WIDTH_PIXELS / 2)
-#define VIDEO_4_BIT_MODE_LEFT ((704 - VIDEO_4_BIT_MODE_WIDTH_SAMPLES) / 2) 
-#define VIDEO_4_BIT_MODE_HEIGHT 480 
-#define VIDEO_4_BIT_MODE_TOP (480 / 2 - VIDEO_4_BIT_MODE_HEIGHT / 2)
+#define VIDEO_8_BIT_MODE_WIDTH_SAMPLES 704
+#define VIDEO_8_BIT_MODE_WIDTH_PIXELS (VIDEO_8_BIT_MODE_WIDTH_SAMPLES / 2)
+#define VIDEO_8_BIT_MODE_ROWBYTES (VIDEO_8_BIT_MODE_WIDTH_PIXELS)
+#define VIDEO_8_BIT_MODE_LEFT ((704 - VIDEO_8_BIT_MODE_WIDTH_SAMPLES) / 2) 
+#define VIDEO_8_BIT_MODE_HEIGHT 480 
+#define VIDEO_8_BIT_MODE_TOP (480 / 2 - VIDEO_8_BIT_MODE_HEIGHT / 2)
 
-uint8_t *Video4BitFramebuffer;
+uint8_t *Video8BitFramebuffer;
 
-uint8_t Video4BitColorsToNTSC[16][4];
+uint8_t Video8BitColorsToNTSC[256][4];
 
-void Video4BitSetPaletteEntry(int color, uint8_t r, uint8_t g, uint8_t b)
+void Video8BitSetPaletteEntry(int color, uint8_t r, uint8_t g, uint8_t b)
 {
     float y, i, q;
     RoRGBToYIQ(r / 255.0f, g / 255.0f, b / 255.0f, &y, &i, &q);
 
     for(int phase = 0; phase < 4; phase++) {
-        Video4BitColorsToNTSC[color][phase] = RoNTSCYIQToDAC(y, i, q, phase / 4.0);
+        Video8BitColorsToNTSC[color][phase] = RoNTSCYIQToDAC(y, i, q, phase / 4.0f);
     }
 }
 
-uint8_t Video4BitGetColorIndex(int x, uint8_t *rowColors)
+void Video8BitSetPaletteEntry(int color, float r, float g, float b)
 {
-    if((x & 0b1) == 0) {
-        return rowColors[x / 2] & 0xF;
-    } else {
-        return (rowColors[x / 2] & 0xF0) >> 4;
+    float y, i, q;
+    RoRGBToYIQ(r, g, b, &y, &i, &q);
+
+    for(int phase = 0; phase < 4; phase++) {
+        Video8BitColorsToNTSC[color][phase] = RoNTSCYIQToDAC(y, i, q, phase / 4.0f);
     }
 }
 
-int Video4BitModeNeedsColorburst()
+uint8_t Video8BitGetColorIndex(int x, uint8_t *rowColors)
+{
+    return rowColors[x];
+}
+
+int Video8BitModeNeedsColorburst()
 {
     return 1;
 }
 
-static int Video4BitModeInit([[maybe_unused]] void *private_data, uint8_t, uint8_t)
+static uint8_t Video8BitModeBlack;
+static uint8_t Video8BitModeWhite;
+
+static int Video8BitModeInit([[maybe_unused]] void *private_data, uint8_t black_, uint8_t white_)
 {
-    Video4BitFramebuffer = new(std::nothrow) uint8_t[VIDEO_4_BIT_MODE_ROWBYTES * VIDEO_4_BIT_MODE_HEIGHT];
-    if(Video4BitFramebuffer == nullptr)
+    Video8BitModeBlack = black_;
+    Video8BitModeWhite = white_;
+    Video8BitFramebuffer = new(std::nothrow) uint8_t[VIDEO_8_BIT_MODE_ROWBYTES * VIDEO_8_BIT_MODE_HEIGHT];
+    if(Video8BitFramebuffer == nullptr)
     {
         // out of memory
         return 0;
@@ -72,40 +83,38 @@ static int Video4BitModeInit([[maybe_unused]] void *private_data, uint8_t, uint8
     return 1;
 }
 
-static void Video4BitModeFini([[maybe_unused]] void *private_data)
+static void Video8BitModeFini([[maybe_unused]] void *private_data)
 {
-    delete[] Video4BitFramebuffer;
+    delete[] Video8BitFramebuffer;
 }
 
-__attribute__((hot,flatten)) void Video4BitModeFillRowBuffer([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
+__attribute__((hot,flatten)) void Video8BitModeFillRowBuffer([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
-    if((rowNumber >= VIDEO_4_BIT_MODE_TOP) && (rowNumber < VIDEO_4_BIT_MODE_HEIGHT))
+    if((rowNumber >= VIDEO_8_BIT_MODE_TOP) && (rowNumber < VIDEO_8_BIT_MODE_HEIGHT))
     {
-        int rowIndex = rowNumber - VIDEO_4_BIT_MODE_TOP;
-        uint8_t* rowColors = Video4BitFramebuffer + rowIndex * VIDEO_4_BIT_MODE_ROWBYTES;
+        int rowIndex = rowNumber - VIDEO_8_BIT_MODE_TOP;
+        uint8_t* rowColors = Video8BitFramebuffer + rowIndex * VIDEO_8_BIT_MODE_ROWBYTES;
 
         // convert rowColors to NTSC waveform into rowDst 2 samples at a time.
-        rowBuffer += VIDEO_4_BIT_MODE_LEFT;
+        rowBuffer += VIDEO_8_BIT_MODE_LEFT;
 
-        // two at a time
-        for(int i = 0; i < VIDEO_4_BIT_MODE_WIDTH_PIXELS; i += 2)
+        for(int i = 0; i < VIDEO_8_BIT_MODE_WIDTH_PIXELS; i += 2)
         {
             uint8_t fb_byte = *rowColors++;
 
-            uint8_t nybble = fb_byte & 0xF;
-            uint8_t *color = Video4BitColorsToNTSC[nybble];
+            uint8_t *color = Video8BitColorsToNTSC[fb_byte];
             *rowBuffer++ = color[0];
             *rowBuffer++ = color[1];
 
-            nybble = fb_byte >> 4;
-            color = Video4BitColorsToNTSC[nybble];
+            fb_byte = *rowColors++;
+            color = Video8BitColorsToNTSC[fb_byte];
             *rowBuffer++ = color[2];
             *rowBuffer++ = color[3];
         }
     }
 }
 
-const static unsigned char RGBFor4BitPalette[][3] = {
+[[maybe_unused]] const static unsigned char RGBFor4BitPalette[][3] = {
     // From Arne's 16-color general purpose palette
      {0, 0, 0},
      {157, 157, 157},
@@ -126,32 +135,66 @@ const static unsigned char RGBFor4BitPalette[][3] = {
      {255, 0, 255},
 };
 
-void Set4BitVideoMode()
+void HSVToRGB3f(float h, float s, float v, float *r, float *g, float *b)
 {
-    for(int i = 0; i < 16; i++)
-    {
-        const uint8_t *c = RGBFor4BitPalette[i];
-        Video4BitSetPaletteEntry(i, c[0], c[1], c[2]);
+    if(s < .00001) {
+        *r = v; *g = v; *b = v;
+    } else {
+        int i;
+        float p, q, t, f;
+
+        h = fmod(h, M_PI * 2);  /* wrap just in case */
+
+        i = floor(h / (M_PI / 3));
+
+        /*
+         * would have used "f = fmod(h, M_PI / 3);", but fmod seems to have
+         * a bug under Linux.
+         */
+
+        f = h / (M_PI / 3) - floor(h / (M_PI / 3));
+
+        p = v * (1 - s);
+        q = v * (1 - s * f);
+        t = v * (1 - s * (1 - f));
+        switch(i) {
+            case 0: *r = v; *g = t; *b = p; break;
+            case 1: *r = q; *g = v; *b = p; break;
+            case 2: *r = p; *g = v; *b = t; break;
+            case 3: *r = p; *g = q; *b = v; break;
+            case 4: *r = t; *g = p; *b = v; break;
+            case 5: *r = v; *g = p; *b = q; break;
+        }
     }
-    RoNTSCSetMode(1, RO_VIDEO_ROW_SAMPLES_912, nullptr, Video4BitModeInit, Video4BitModeFini, Video4BitModeFillRowBuffer, Video4BitModeNeedsColorburst);
+}
+
+void Set8BitVideoMode()
+{
+    for(int i = 0; i < 256; i++)
+    {
+        // H3S2V3
+        float h = ((i >> 5) & 7) / 7.0f * M_PI * 2;
+        float s = ((i >> 3) & 3) / 3.0f;
+        float v = ((i >> 0) & 7) / 7.0f;
+        float r, g, b;
+        HSVToRGB3f(h, s, v, &r, &g, &b);
+        Video8BitSetPaletteEntry(i, r, g, b);
+    }
+    RoNTSCSetMode(1, RO_VIDEO_ROW_SAMPLES_912, nullptr, Video8BitModeInit, Video8BitModeFini, Video8BitModeFillRowBuffer, Video8BitModeNeedsColorburst);
 }
 
 int SetPixel(int x, int y, int c)
 {
-    int whichByte = x / 2;
-    int whichNybble = x % 2;
-    uint8_t value = c << (whichNybble * 4);
-    uint8_t mask = ~(0xF << (whichNybble * 4));
-    uint8_t *byte = Video4BitFramebuffer + y * VIDEO_4_BIT_MODE_ROWBYTES + whichByte;
-    *byte = (*byte & mask) | value;
+    uint8_t *byte = Video8BitFramebuffer + y * VIDEO_8_BIT_MODE_ROWBYTES + x;
+    *byte = c;
     return 1;
 }
 
 void ClearScreen(int c)
 {
-    for(int y = 0; y < VIDEO_4_BIT_MODE_HEIGHT; y++)
+    for(int y = 0; y < VIDEO_8_BIT_MODE_HEIGHT; y++)
     {
-        for(int x = 0; x < VIDEO_4_BIT_MODE_WIDTH_PIXELS; x++)
+        for(int x = 0; x < VIDEO_8_BIT_MODE_WIDTH_PIXELS; x++)
         {
             SetPixel(x, y, c);
         }
@@ -159,7 +202,8 @@ void ClearScreen(int c)
 }
 
 enum {
-    MAX_ROW_SIZE = 4096,
+    MAX_SCREEN_ROW_PIXELS = 1024,
+    MAX_FILE_ROW_PIXELS = 4096,
 };
 
 int FindClosestColor(unsigned char palette[][3], int paletteSize, int r, int g, int b)
@@ -192,28 +236,39 @@ int main([[maybe_unused]] int argc, const char **argv)
 
     filename = argv[1];
 
-    Set4BitVideoMode();
+    Set8BitVideoMode();
     ClearScreen(1);
 
-    if(false)
+    if(true)
     {
-        for(int y = 0; y < VIDEO_4_BIT_MODE_HEIGHT; y++)
+        for(int y = 0; y < VIDEO_8_BIT_MODE_HEIGHT; y++)
         {
-            for(int x = 0; x < VIDEO_4_BIT_MODE_WIDTH_PIXELS; x++)
+            for(int x = 0; x < VIDEO_8_BIT_MODE_WIDTH_PIXELS; x++)
             {
-                int c = x * 16 / VIDEO_4_BIT_MODE_WIDTH_PIXELS;
+                int c = x * 256 / VIDEO_8_BIT_MODE_WIDTH_PIXELS;
                 SetPixel(x, y, c);
             }
         }
     }
 
-    unsigned char (*palette)[3] = (unsigned char (*)[3])malloc(sizeof(palette[0]) * 256);
+    int paletteSize = 256;
+    unsigned char (*palette)[3] = (unsigned char (*)[3])malloc(sizeof(palette[0]) * paletteSize);
     if(palette == NULL) {
         printf("failed to allocate palette\n");
         exit(1);
     }
-    memcpy(palette, RGBFor4BitPalette, sizeof(RGBFor4BitPalette));
-    int paletteSize = 16;
+    for(int i = 0; i < paletteSize; i++)
+    {
+        // H3S2V3
+        float h = ((i >> 5) & 7) / 7.0f * M_PI * 2;
+        float s = ((i >> 3) & 3) / 3.0f;
+        float v = ((i >> 0) & 7) / 7.0f;
+        float r, g, b;
+        HSVToRGB3f(h, s, v, &r, &g, &b);
+        palette[i][0] = r * 255;
+        palette[i][1] = g * 255;
+        palette[i][2] = b * 255;
+    }
 
     FILE *fp;
     fp = fopen (filename, "rb");
@@ -230,7 +285,6 @@ int main([[maybe_unused]] int argc, const char **argv)
         exit(1);
     }
 
-
     if((ppmtype != 5) && (ppmtype != 6)) {
         printf("unsupported image type %d for \"%s\"\n", ppmtype, filename);
         free(palette);
@@ -238,16 +292,16 @@ int main([[maybe_unused]] int argc, const char **argv)
         exit(1);
     }
 
-    if(width > MAX_ROW_SIZE) {
+    if(width > MAX_FILE_ROW_PIXELS) {
 	printf("ERROR: width %d of image in \"%s\" is too large for static row of %u pixels\n",
-            width, filename, MAX_ROW_SIZE);
+            width, filename, MAX_SCREEN_ROW_PIXELS);
         free(palette);
         fclose(fp);
         exit(1);
     }
 
     static unsigned char (*rowRGB)[3];
-    rowRGB = (unsigned char (*)[3]) malloc(sizeof(rowRGB[0]) * MAX_ROW_SIZE);
+    rowRGB = (unsigned char (*)[3]) malloc(sizeof(rowRGB[0]) * MAX_FILE_ROW_PIXELS);
     if(rowRGB == NULL) {
         printf("failed to allocate row for pixel data\n");
         free(palette);
@@ -255,10 +309,9 @@ int main([[maybe_unused]] int argc, const char **argv)
         exit(1);
     }
 
-    signed short (*rowError)[MAX_ROW_SIZE][3]; // + 1 in either direction
+    signed short (*rowError)[MAX_SCREEN_ROW_PIXELS][3]; // + 1 in either direction
     int currentErrorRow = 0;
-    rowError = (signed short (*)[MAX_ROW_SIZE][3])malloc(sizeof(rowError[0]) * 2);
-    memset(rowError, 0, sizeof(rowError[0]) * 2);
+    rowError = (signed short (*)[MAX_SCREEN_ROW_PIXELS][3])malloc(sizeof(rowError[0]) * 2);
     if(rowError == NULL) {
         printf("failed to allocate row for error data\n");
         free(rowRGB);
@@ -266,23 +319,29 @@ int main([[maybe_unused]] int argc, const char **argv)
         fclose(fp);
         exit(1);
     }
+    memset(rowError, 0, sizeof(rowError[0]) * 2);
 
     int prevImageRow = -1;
-    for(int y = 0; y < VIDEO_4_BIT_MODE_HEIGHT; y++)
+    for(int y = 0; y < VIDEO_8_BIT_MODE_HEIGHT; y++)
     {
-        int srcRow = y * height / VIDEO_4_BIT_MODE_HEIGHT;
+        int srcRow = y * height / VIDEO_8_BIT_MODE_HEIGHT;
 
         while (prevImageRow < srcRow) {
-            if(ppmtype == 6) {
-                if(fread(rowRGB, 3, width, fp) != (size_t)width) {
+            if(ppmtype == 6)
+            {
+                if(fread(rowRGB, 3, width, fp) != (size_t)width)
+                {
                     printf("ERROR: couldn't read row %d from \"%s\"\n", srcRow, filename);
                     free(palette);
                     free(rowError);
                     free(rowRGB);
                     exit(1);
                 }
-            } else if(ppmtype == 5) {
-                if(fread(rowRGB, 1, width, fp) != (size_t)width) {
+            }
+            else if(ppmtype == 5)
+            {
+                if(fread(rowRGB, 1, width, fp) != (size_t)width)
+                {
                     printf("ERROR: couldn't read row %d from \"%s\"\n", srcRow, filename);
                     free(palette);
                     free(rowError);
@@ -290,7 +349,8 @@ int main([[maybe_unused]] int argc, const char **argv)
                     exit(1);
                 }
                 // expand P5 row to P6 RGB
-                for(int i = 0; i < width; i++) {
+                for(int i = 0; i < width; i++)
+                {
                     int x = width - 1 - i;
                     unsigned char gray = ((unsigned char *)rowRGB)[x];
                     rowRGB[x][0] = gray;
@@ -307,8 +367,8 @@ int main([[maybe_unused]] int argc, const char **argv)
         memset(rowError[nextErrorRow], 0, sizeof(rowError[0]));
         short (*errorNextRowFixed8)[3] = rowError[nextErrorRow] + 1;   // So we can access -1 without bounds check
 
-        for(int x = 0; x < VIDEO_4_BIT_MODE_WIDTH_PIXELS; x++) {
-            int srcCol = (x * width + width - 1) / VIDEO_4_BIT_MODE_WIDTH_PIXELS;
+        for(int x = 0; x < VIDEO_8_BIT_MODE_WIDTH_PIXELS; x++) {
+            int srcCol = (x * width + width - 1) / VIDEO_8_BIT_MODE_WIDTH_PIXELS;
 
             // get the color with error diffused from previous pixels
             int correctedRGB[3];
