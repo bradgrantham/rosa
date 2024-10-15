@@ -113,83 +113,22 @@ uint8_t RoGetJoystickState(RoControllerIndex which);
 uint8_t RoGetKeypadState(RoControllerIndex which);
 
 //----------------------------------------------------------------------------
-// DAC
-
-#define DAC_VALUE_LIMIT 0xFF
-
-#define MAX_DAC_VOLTAGE 1.32f
-#define MAX_DAC_VOLTAGE_F16 (132 * 65536 / 100)
-
-#define INLINE inline
-
-INLINE float RoDACValueToVoltage(uint8_t value)
-{
-    return value * MAX_DAC_VOLTAGE / 255;
-}
-
-INLINE unsigned char RoDACVoltageToValue(float voltage)
-{
-    if(voltage < 0.0f) {
-        return 0x0;
-    }
-    uint32_t value = (uint32_t)(voltage / MAX_DAC_VOLTAGE * 255);
-    if(value >= DAC_VALUE_LIMIT) {
-        return DAC_VALUE_LIMIT;
-    }
-    return value;
-}
-
-INLINE unsigned char RoDACVoltageToValueNoBounds(float voltage)
-{
-    return (uint32_t)(voltage / MAX_DAC_VOLTAGE * 255);
-}
-
-INLINE int RoDACVoltageToValueFixed16NoBounds(int voltage)
-{
-    return (uint32_t)(voltage * 65535 / MAX_DAC_VOLTAGE_F16) * 256;
-}
-
-
-//----------------------------------------------------------------------------
-// NTSC timing and voltage levels
-
-#define NTSC_COLORBURST_FREQUENCY       3579545
+// Video configuration
 
 typedef enum {
-    RO_VIDEO_ROW_SAMPLES_912 = 1,          // 912 samples, 4 per colorburst cycle
-    RO_VIDEO_ROW_SAMPLES_1368 = 2,         // 1368 samples, 6 per colorburst cycle
+    RO_VIDEO_ROW_SAMPLES_910 = 1,          // 912 samples, 4 per colorburst cycle
+    RO_VIDEO_ROW_SAMPLES_912 = 2,          // 912 samples, 4 per colorburst cycle
+    RO_VIDEO_ROW_SAMPLES_1368 = 3,         // 1368 samples, 6 per colorburst cycle
 } RoRowConfig;
 
-// Number of samples we target; if we're doing 4x colorburst at 228 cycles, that's 912 samples at 14.318180MHz
-
-#define NTSC_EQPULSE_LINES	3
-#define NTSC_VSYNC_LINES	3
-#define NTSC_VBLANK_LINES	11
-#define NTSC_FRAME_LINES	525
-
-/* these are in units of one scanline */
-#define NTSC_EQ_PULSE_INTERVAL	.04
-#define NTSC_VSYNC_BLANK_INTERVAL	.43
-#define NTSC_HOR_SYNC_DUR	.075
-#define NTSC_FRONTPORCH		.02
-/* BACKPORCH including COLORBURST */
-#define NTSC_BACKPORCH		.075
-
-#define NTSC_COLORBURST_CYCLES  9
-
-#define NTSC_FRAMES		(59.94 / 2)
-
-#define NTSC_SYNC_TIP_VOLTAGE   0.0f
-#define NTSC_SYNC_PORCH_VOLTAGE   .285f
-#define NTSC_SYNC_BLACK_VOLTAGE   .339f
-#define NTSC_SYNC_WHITE_VOLTAGE   1.0f  /* VCR had .912v */
-
-#define NTSC_SYNC_BLACK_VOLTAGE_F16   22217
-#define NTSC_SYNC_WHITE_VOLTAGE_F16   65536
+typedef int (*RoVideoModeInitFunc)(void* private_data, uint8_t blackvalue, uint8_t whitevalue);
+typedef void (*RoVideoModeFiniFunc)(void* private_data);
+typedef void (*RoVideoModeFillLineBufferFunc)(int frameIndex, int lineWithinField, int lineNumber, size_t maxSamples, uint8_t* lineBuffer);
+typedef int (*RoVideoModeNeedsColorburstFunc)();
 
 typedef uint32_t ntsc_wave_t;
 
-INLINE unsigned char RoNTSCYIQToDAC(float y, float i, float q, float tcycles)
+inline unsigned char RoNTSCYIQToDAC(float y, float i, float q, float tcycles, uint8_t black, uint8_t white)
 {
 // This is transcribed from the NTSC spec, double-checked.
     float w_t = tcycles * M_PI * 2;
@@ -198,10 +137,10 @@ INLINE unsigned char RoNTSCYIQToDAC(float y, float i, float q, float tcycles)
     float signal = y + q * sine + i * cosine;
 // end of transcription
 
-    return RoDACVoltageToValue(NTSC_SYNC_BLACK_VOLTAGE + signal * (NTSC_SYNC_WHITE_VOLTAGE - NTSC_SYNC_BLACK_VOLTAGE));
+    return black + signal * (white - black);
 }
 
-INLINE unsigned char RoNTSCYIQDegreesToDAC(float y, float i, float q, int degrees)
+inline unsigned char RoNTSCYIQDegreesToDAC(float y, float i, float q, int degrees, uint8_t black, uint8_t white)
 {
     float sine, cosine;
     if(degrees == 0) {
@@ -222,21 +161,11 @@ INLINE unsigned char RoNTSCYIQDegreesToDAC(float y, float i, float q, int degree
     }
     float signal = y + q * sine + i * cosine;
 
-    return RoDACVoltageToValueNoBounds(NTSC_SYNC_BLACK_VOLTAGE + signal * (NTSC_SYNC_WHITE_VOLTAGE - NTSC_SYNC_BLACK_VOLTAGE));
-}
-
-INLINE ntsc_wave_t RoNTSCYIQToWave(float y, float i, float q)
-{
-    unsigned char b0 = RoNTSCYIQToDAC(y, i, q,  .0f);
-    unsigned char b1 = RoNTSCYIQToDAC(y, i, q, .25f);
-    unsigned char b2 = RoNTSCYIQToDAC(y, i, q, .50f);
-    unsigned char b3 = RoNTSCYIQToDAC(y, i, q, .75f);
-
-    return (b0 << 0) | (b1 << 8) | (b2 << 16) | (b3 << 24);
+    return black + signal * (white - black);
 }
 
 // This is transcribed from the NTSC spec, double-checked.
-INLINE void RoRGBToYIQ(float r, float g, float b, float *y, float *i, float *q)
+inline void RoRGBToYIQ(float r, float g, float b, float *y, float *i, float *q)
 {
     *y = .30f * r + .59f * g + .11f * b;
     *i = -.27f * (b - *y) + .74f * (r - *y);
@@ -256,27 +185,16 @@ INLINE void RoRGBToYIQ(float r, float g, float b, float *y, float *i, float *q)
 // 1.000000 -1.108545 1.709007
 
 // Using inverse 3x3 matrix above.  Tested numerically to be the inverse of RGBToYIQ
-INLINE void RoYIQToRGB(float y, float i, float q, float *r, float *g, float *b)
+inline void RoYIQToRGB(float y, float i, float q, float *r, float *g, float *b)
 {
     *r = 1.0f * y + .946882f * i + 0.623557f * q;
     *g = 1.000000f * y + -0.274788f * i + -0.635691f * q;
     *b = 1.000000f * y + -1.108545f * i + 1.709007f * q;
 }
 
-INLINE ntsc_wave_t RoNTSCRGBToWave(float r, float g, float b)
-{
-    float y, i, q;
-    RoRGBToYIQ(r, g, b, &y, &i, &q);
-    return RoNTSCYIQToWave(y, i, q);
-}
-
-typedef int (*RoNTSCModeInitFunc)(void* private_data, uint8_t blackvalue, uint8_t whitevalue);
-typedef void (*RoNTSCModeFiniFunc)(void* private_data);
-typedef void (*RoNTSCModeFillRowBufferFunc)(int frameIndex, int rowNumber, size_t maxSamples, uint8_t* rowBuffer);
-typedef int (*RoNTSCModeNeedsColorburstFunc)();
-void RoNTSCSetMode(int interlaced, RoRowConfig row_config, void* privateData, RoNTSCModeInitFunc initFunc, RoNTSCModeFiniFunc finiFunc, RoNTSCModeFillRowBufferFunc fillBufferFunc, RoNTSCModeNeedsColorburstFunc needsColorBurstFunc);
-
-extern void RoNTSCWaitFrame(void);
+void RoVideoSetMode(bool interlaced, RoRowConfig line_config, void* private_data, RoVideoModeInitFunc initFunc, RoVideoModeFiniFunc finiFunc, RoVideoModeFillLineBufferFunc fillBufferFunc, RoVideoModeNeedsColorburstFunc needsColorBurstFunc);
+void RoVideoWaitNextField();
+int RoVideoWaitNextLine();
 
 //----------------------------------------------------------------------------
 // Do periodic work that has to happen > 10 times a second

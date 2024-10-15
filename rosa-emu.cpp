@@ -11,6 +11,8 @@
 #include "SDL.h"
 
 #include "rocinante.h"
+#include "ntsc-kit.h"
+#include "ntsc-kit-platform.h"
 #include "events.h"
 #include "events_internal.h"
 
@@ -319,6 +321,38 @@ static void HandleEvents(void)
     }
 }
 
+#if 0
+#define NTSC_EQ_PULSE_INTERVAL	.04
+#define NTSC_VSYNC_BLANK_INTERVAL	.43
+#define NTSC_HOR_SYNC_DUR	.075
+#define NTSC_FRONTPORCH		.02
+/* BACKPORCH including COLORBURST */
+#define NTSC_BACKPORCH		.075
+#define NTSC_SYNC_BLACK_VOLTAGE   .339f
+#define NTSC_SYNC_WHITE_VOLTAGE   1.0f  /* VCR had .912v */
+#endif
+
+// These correspond to the Rosa v1 8-bit DAC output
+#define DAC_VALUE_LIMIT 0xFF
+#define MAX_DAC_VOLTAGE 1.32f
+
+uint8_t PlatformVoltageToDACValue(float voltage)
+{
+    if(voltage < 0.0f) {
+        return 0x0;
+    }
+    uint32_t value = (uint32_t)(voltage / MAX_DAC_VOLTAGE * 255);
+    if(value >= DAC_VALUE_LIMIT) {
+        return DAC_VALUE_LIMIT;
+    }
+    return value;
+}
+
+float PlatformDACValueToVoltage(uint8_t value)
+{
+    return value * MAX_DAC_VOLTAGE / 255;
+}
+
 std::array<float, 4> carrierIQ;
 float carrierOffsetRadians;
 
@@ -402,8 +436,9 @@ struct Averager
 template <int MULTIPLE, int SAMPLES>
 void DecodeColorToRGB(uint8_t *samples, uint8_t *rgb)
 {
-    float voltage = RoDACValueToVoltage(samples[0]);
+    float voltage = PlatformDACValueToVoltage(samples[0]);
     float value = (voltage - NTSC_SYNC_BLACK_VOLTAGE) / (NTSC_SYNC_WHITE_VOLTAGE - NTSC_SYNC_BLACK_VOLTAGE);
+
     Averager<float, MULTIPLE> value_averaged(value);
     Averager<float, MULTIPLE> y_averaged(0);
     Averager<float, MULTIPLE> i_averaged(0);
@@ -413,7 +448,7 @@ void DecodeColorToRGB(uint8_t *samples, uint8_t *rgb)
     float i, q;
 
     for(int idx = 0; idx < SAMPLES; idx++) {
-        float voltage = RoDACValueToVoltage(samples[idx]);
+        float voltage = PlatformDACValueToVoltage(samples[idx]);
         float value = (voltage - NTSC_SYNC_BLACK_VOLTAGE) / (NTSC_SYNC_WHITE_VOLTAGE - NTSC_SYNC_BLACK_VOLTAGE);
         value_averaged.update(value);
 
@@ -445,83 +480,11 @@ void DecodeColorToRGB(uint8_t *samples, uint8_t *rgb)
 }
 
 // Screen visible sample buffer
-// Sized for 1056 visible row samples
-// If visible row samples is 704, those are "left justified", the remainder of each row is ignored
-const static int SAMPLES_X = 1056;
-const static int SAMPLES_Y = 480;
+// Samples are "left-justified" - if samples == 912, there will be 456 unused samples on each row
+const static int SAMPLES_X = 1368;
+const static int SAMPLES_Y = 525;
 uint8_t samples[SAMPLES_X * SAMPLES_Y];
-
-extern RoRowConfig NTSCRowConfig;
-void Frame(unsigned char *samples, bool decodeColor)
-{
-    if (SDL_MUSTLOCK(surface)) SDL_LockSurface(surface);
-
-    auto before = std::chrono::system_clock::now();
-    uint8_t* framebuffer = reinterpret_cast<uint8_t*>(surface->pixels);
-    for(int y = 0; y < surfaceHeight; y++) {
-        uint8_t *rowpixels = framebuffer + 3 * y * surfaceWidth;
-        uint8_t *rowsamples = samples + y * SAMPLES_X;
-        memset(rowpixels, 0, surfaceWidth * 3);
-        if(decodeColor) {
-            switch(NTSCRowConfig)
-            {
-                case RO_VIDEO_ROW_SAMPLES_912: {
-                    DecodeColorToRGB<4, 704>(rowsamples, rowpixels);
-                    break;
-                }
-                case RO_VIDEO_ROW_SAMPLES_1368: {
-                    DecodeColorToRGB<6, 1056>(rowsamples, rowpixels);
-                    break;
-                }
-            }
-        } else {
-            switch(NTSCRowConfig)
-            {
-                case RO_VIDEO_ROW_SAMPLES_912: {
-                    for(int x = 0; x < 704; x++) {
-                        uint8_t *pixel = rowpixels + 3 * x;
-                        uint8_t *sample = rowsamples + x;
-                        pixel[0] = sample[0];
-                        pixel[1] = sample[0];
-                        pixel[2] = sample[0];
-                    }
-                    break;
-                }
-                case RO_VIDEO_ROW_SAMPLES_1368: {
-                    for(int x = 0; x < 1056; x++) {
-                        uint8_t *pixel = rowpixels + 3 * x;
-                        uint8_t *sample = rowsamples + x;
-                        pixel[0] = sample[0];
-                        pixel[1] = sample[0];
-                        pixel[2] = sample[0];
-                    }
-                    break;
-                }
-            }
-        }
-    }
-    auto after = std::chrono::system_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(after - before).count();
-    if(0) printf("samples to RGB took %.2fms\n", elapsed / 1000.0f);
-
-    before = std::chrono::system_clock::now();
-    if (SDL_MUSTLOCK(surface)) SDL_UnlockSurface(surface);
-
-    SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
-    if(!texture) {
-        printf("could not create texture\n");
-        exit(1);
-    }
-    SDL_RenderClear(renderer);
-    // SDL_Rect srcrect { 0, 0, surfaceWidth, surfaceHeight };
-    // SDL_Rect dstrect { 0, 0, SCREEN_X, SCREEN_Y };
-    SDL_RenderCopy(renderer, texture, nullptr, nullptr); // &srcrect, &dstrect);
-    SDL_RenderPresent(renderer);
-    SDL_DestroyTexture(texture);
-    after = std::chrono::system_clock::now();
-    elapsed = std::chrono::duration_cast<std::chrono::microseconds>(after - before).count();
-    if(0) printf("SDL texture upload took %.2fms\n", elapsed / 1000.0f);
-}
+bool samplesAreAValidFrame = false;
 
 #if defined(EMSCRIPTEN)
 void caller(void *f_)
@@ -665,67 +628,6 @@ uint8_t RoGetKeypadState(RoControllerIndex which)
     return 0;
 }
 
-bool NTSCModeFuncsValid = false;
-void* NTSCModePrivateData;
-RoNTSCModeFiniFunc NTSCModeFinalize;
-RoNTSCModeFillRowBufferFunc NTSCModeFillRowBuffer;
-RoNTSCModeNeedsColorburstFunc NTSCModeNeedsColorburst;
-bool NTSCModeInterlaced = false;
-// RO_VIDEO_ROW_SAMPLES_912 = 1,          // 912 samples, 4 per colorburst cycle
-// RO_VIDEO_ROW_SAMPLES_1368 = 2,         // 1368 samples, 6 per colorburst cycle
-RoRowConfig NTSCRowConfig;
-
-void RoNTSCSetMode(int interlaced_, RoRowConfig row_config, void* private_data, RoNTSCModeInitFunc initFunc, RoNTSCModeFiniFunc finiFunc_, RoNTSCModeFillRowBufferFunc fillBufferFunc_, RoNTSCModeNeedsColorburstFunc needsColorBurstFunc_)
-{
-    // XXX Need to lock here versus any threaded access to these variables
-    NTSCModeFuncsValid = false;
-
-    NTSCRowConfig = row_config;
-    SDL_FreeSurface(surface);
-    switch(NTSCRowConfig)
-    {
-        case RO_VIDEO_ROW_SAMPLES_912: {
-            surfaceWidth = 704;
-            break;
-        }
-        case RO_VIDEO_ROW_SAMPLES_1368: {
-            surfaceWidth = 1056;
-            break;
-        }
-    }
-    surface = SDL_CreateRGBSurface(0, surfaceWidth, surfaceHeight, 24, 0, 0, 0, 0);
-    if(!surface) {
-        printf("could not create surface\n");
-        exit(1);
-    }
-
-    if(NTSCModeFinalize != nullptr)
-    {
-        NTSCModeFinalize(NTSCModePrivateData);
-    }
-
-    NTSCModeFinalize = finiFunc_;
-    NTSCModePrivateData = private_data;
-    NTSCModeFillRowBuffer = fillBufferFunc_;
-    NTSCModeNeedsColorburst = needsColorBurstFunc_;
-    NTSCModeInterlaced = interlaced_;
-
-    /* Should black and white be similar to HW values to exercise reduced precision? */
-    [[maybe_unused]] int result = initFunc(private_data, 0, 255);
-    assert(result == 1);
-
-    NTSCModeFuncsValid = true;
-}
-
-extern void RoNTSCWaitFrame(void)
-{
-    static bool once = false;
-    if(!once) {
-        printf("called unimplemented %s\n", __func__);
-        once = true;
-    }
-}
-
 void RoDelayMillis(uint32_t millis)
 {
     std::this_thread::sleep_for(std::chrono::milliseconds(millis));
@@ -739,6 +641,196 @@ uint32_t RoGetMillis()
     auto elapsed_millis = std::chrono::duration_cast<std::chrono::milliseconds>(now - systemStart).count();
     return elapsed_millis;
 }
+
+bool videoEnabled = false;
+NTSCLineConfig videoLineConfig;
+bool videoInterlaced;
+int videoLineNumber;
+int videoFrameNumber = 0;
+
+int PlatformGetNTSCLineNumber()
+{
+    return videoLineNumber;
+}
+
+bool continueScanout = false;
+
+void scanoutThreadFunc()
+{
+    using namespace std::chrono_literals;
+
+    // Half-clocks
+    using halfCBRate = std::chrono::duration<double, std::ratio<1, 2 * 3579545>>; // half colorbursts at 3579545Hz
+    auto scanoutStarted = std::chrono::high_resolution_clock::now();
+    uint64_t previousLinesSinceStart = 0;
+    int halfCBsPerLine = (videoLineConfig == NTSC_LINE_SAMPLES_910) ? 455 : 456;
+
+    while(continueScanout)
+    {
+        uint64_t linesSinceStart;
+        std::chrono::time_point<std::chrono::high_resolution_clock> now;
+
+        // This is expected to run faster than line rate, but have to handle the case of a thread stall
+        do
+        {
+            now = std::chrono::high_resolution_clock::now();
+            auto halfCBsSinceStart = halfCBRate(now - scanoutStarted).count();
+            linesSinceStart = static_cast<uint64_t>(halfCBsSinceStart) / halfCBsPerLine;
+        }
+        while(linesSinceStart == previousLinesSinceStart);
+
+        // So call fill function for all lines between most recently scanned and the current expected scanned
+        for(uint64_t i = previousLinesSinceStart + 1; i <= linesSinceStart; i++)
+        {
+            NTSCFillLineBuffer(videoFrameNumber, videoLineNumber, samples + SAMPLES_X * videoLineNumber);
+            videoLineNumber ++;
+            bool endOfFrame = videoInterlaced ? (videoLineNumber >= 525) : (videoLineNumber >= 262);
+            if(endOfFrame)
+            {
+                videoFrameNumber ++;
+                videoLineNumber = 0;
+                samplesAreAValidFrame = true;
+            }
+        }
+
+        previousLinesSinceStart = linesSinceStart;
+    }
+}
+
+std::thread* scanoutThread;
+
+void PlatformEnableNTSCScanout(NTSCLineConfig line_config, bool interlaced)
+{
+    videoEnabled = true;
+    videoLineConfig = line_config;
+    videoInterlaced = interlaced;
+    continueScanout = true;
+    samplesAreAValidFrame = false;
+    scanoutThread = new std::thread(scanoutThreadFunc);
+}
+
+void PlatformDisableNTSCScanout()
+{
+    videoEnabled = false;
+    continueScanout = false;
+    scanoutThread->join();
+    samplesAreAValidFrame = false;
+    delete scanoutThread;
+}
+
+void Frame(unsigned char *samples)
+{
+    if (SDL_MUSTLOCK(surface)) SDL_LockSurface(surface);
+
+    auto before = std::chrono::system_clock::now();
+    bool decodeColor = false; // detect colorburst
+    uint8_t* framebuffer = reinterpret_cast<uint8_t*>(surface->pixels);
+
+    for(int y = 0; y < surfaceHeight; y++) {
+        uint8_t *rowpixels = framebuffer + 3 * y * surfaceWidth;
+        uint8_t *rowsamples = samples + y * SAMPLES_X;
+        switch(videoLineConfig)
+        {
+            case NTSC_LINE_SAMPLES_910: {
+                rowsamples += static_cast<int>(910 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
+                break;
+            }
+            case NTSC_LINE_SAMPLES_912: {
+                rowsamples += static_cast<int>(912 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
+                break;
+            }
+            case NTSC_LINE_SAMPLES_1368: {
+                rowsamples += static_cast<int>(1368 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
+                break;
+            }
+        }
+        memset(rowpixels, 0, surfaceWidth * 3);
+        if(decodeColor) {
+            switch(videoLineConfig)
+            {
+                case NTSC_LINE_SAMPLES_910: {
+                    // XXX this is wrong, need a phase shift per line
+                    DecodeColorToRGB<4, 704>(rowsamples, rowpixels);
+                    break;
+                }
+                case NTSC_LINE_SAMPLES_912: {
+                    DecodeColorToRGB<4, 704>(rowsamples, rowpixels);
+                    break;
+                }
+                case NTSC_LINE_SAMPLES_1368: {
+                    DecodeColorToRGB<6, 1056>(rowsamples, rowpixels);
+                    break;
+                }
+            }
+        } else {
+            switch(videoLineConfig)
+            {
+                case NTSC_LINE_SAMPLES_910:
+                {
+                    for(int x = 0; x < 704; x++) {
+                        uint8_t *pixel = rowpixels + 3 * x;
+                        uint8_t *sample = rowsamples + x;
+                        pixel[0] = sample[0];
+                        pixel[1] = sample[0];
+                        pixel[2] = sample[0];
+                    }
+                    break;
+                }
+                case NTSC_LINE_SAMPLES_912:
+                {
+                    for(int x = 0; x < 704; x++) {
+                        uint8_t *pixel = rowpixels + 3 * x;
+                        uint8_t *sample = rowsamples + x;
+                        pixel[0] = sample[0];
+                        pixel[1] = sample[0];
+                        pixel[2] = sample[0];
+                    }
+                    break;
+                }
+                case NTSC_LINE_SAMPLES_1368:
+                {
+                    for(int x = 0; x < 1056; x++) {
+                        uint8_t *pixel = rowpixels + 3 * x;
+                        uint8_t *sample = rowsamples + x;
+                        pixel[0] = sample[0];
+                        pixel[1] = sample[0];
+                        pixel[2] = sample[0];
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    auto after = std::chrono::system_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(after - before).count();
+    if(0) printf("samples to RGB took %.2fms\n", elapsed / 1000.0f);
+
+    before = std::chrono::system_clock::now();
+    if (SDL_MUSTLOCK(surface)) SDL_UnlockSurface(surface);
+
+    SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
+    if(!texture) {
+        printf("could not create texture\n");
+        exit(1);
+    }
+    SDL_RenderClear(renderer);
+    // SDL_Rect srcrect { 0, 0, surfaceWidth, surfaceHeight };
+    // SDL_Rect dstrect { 0, 0, SCREEN_X, SCREEN_Y };
+    SDL_RenderCopy(renderer, texture, nullptr, nullptr); // &srcrect, &dstrect);
+    SDL_RenderPresent(renderer);
+    SDL_DestroyTexture(texture);
+    after = std::chrono::system_clock::now();
+    elapsed = std::chrono::duration_cast<std::chrono::microseconds>(after - before).count();
+    if(0) printf("SDL texture upload took %.2fms\n", elapsed / 1000.0f);
+}
+
+
+/*
+# moving to NTSC kit
+decode samples in DoHouseKeeping
+    need to block on getting a whole frame of samples
+    maybe just check that frameNumber has gone forward
+*/
 
 int RoDoHousekeeping(void)
 {
@@ -766,56 +858,14 @@ int RoDoHousekeeping(void)
         }
     }
 
-    bool needsColorburst = NTSCModeNeedsColorburst();
-
     now = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_frame_processing).count();
     if(elapsed > 15) {
         last_frame_processing = now;
-        auto caliper_start = std::chrono::system_clock::now();
-        if(NTSCModeInterlaced) {
-            for(int lineNumber = 0; lineNumber < surfaceHeight; lineNumber++) {
-                if(NTSCModeFuncsValid) {
-                    uint8_t *rowsamples = samples + lineNumber * SAMPLES_X;
-                    memset(rowsamples, 86, SAMPLES_X);
-                    switch(NTSCRowConfig)
-                    {
-                        case RO_VIDEO_ROW_SAMPLES_912: {
-                            NTSCModeFillRowBuffer(0, lineNumber, 704, rowsamples);
-                            break;
-                        }
-                        case RO_VIDEO_ROW_SAMPLES_1368: {
-                            NTSCModeFillRowBuffer(0, lineNumber, 1056, rowsamples);
-                            break;
-                        }
-                    }
-                }
-            }
-        } else {
-            for(int lineNumber = 0; lineNumber < 240; lineNumber++) {
-                if(NTSCModeFuncsValid) {
-                    uint8_t *rowsamples = samples + (lineNumber * 2 + 0) * SAMPLES_X;
-                    memset(rowsamples, 86, SAMPLES_X);
-                    switch(NTSCRowConfig)
-                    {
-                        case RO_VIDEO_ROW_SAMPLES_912: {
-                            NTSCModeFillRowBuffer(0, lineNumber, 704, rowsamples);
-                            break;
-                        }
-                        case RO_VIDEO_ROW_SAMPLES_1368: {
-                            NTSCModeFillRowBuffer(0, lineNumber, 1056, rowsamples);
-                            break;
-                        }
-                    }
-                    memcpy(rowsamples + SAMPLES_X, rowsamples, SAMPLES_X);
-                }
-            }
+        if(samplesAreAValidFrame)
+        {
+            Frame(samples);
         }
-        auto caliper_end = std::chrono::system_clock::now();
-        auto caliper_elapsed = std::chrono::duration_cast<std::chrono::microseconds>(caliper_end - caliper_start).count();
-        if(0) printf("filling row buffers took %.2fms\n", caliper_elapsed / 1000.0f);
-
-        Frame(samples, needsColorburst);
     }
 
     return 0;
@@ -826,11 +876,6 @@ extern "C" {
 }
 
 /*
-    make thread filling the samples buffer
-        like STM32 RowHandler, incrementing linenumber and frame number etc
-        track time - as close as possible to 15... KHz
-        call row funcs
-    implement RoGetMillis and RoDelay
     wrap elapsed time around Frame(samples)
     implement EventPoll
     implement DebugOverlay
@@ -850,6 +895,7 @@ int main(int argc, char **argv)
     size_t preferredAudioBufferSizeBytes;
 
     InitColorDecodeTables(getenv("OFFSET") ? atof(getenv("OFFSET")) : 123.0f);
+    NTSCInitialize();
 
     const char *rootDirName = nullptr;
 

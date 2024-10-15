@@ -36,13 +36,16 @@ uint8_t *Video8BitFramebuffer;
 
 uint8_t Video8BitColorsToNTSC[256][4];
 
+static uint8_t Video8BitModeBlack;
+static uint8_t Video8BitModeWhite;
+
 void Video8BitSetPaletteEntry(int color, uint8_t r, uint8_t g, uint8_t b)
 {
     float y, i, q;
     RoRGBToYIQ(r / 255.0f, g / 255.0f, b / 255.0f, &y, &i, &q);
 
     for(int phase = 0; phase < 4; phase++) {
-        Video8BitColorsToNTSC[color][phase] = RoNTSCYIQToDAC(y, i, q, phase / 4.0f);
+        Video8BitColorsToNTSC[color][phase] = RoNTSCYIQToDAC(y, i, q, phase / 4.0f, Video8BitModeBlack, Video8BitModeWhite);
     }
 }
 
@@ -52,7 +55,7 @@ void Video8BitSetPaletteEntry(int color, float r, float g, float b)
     RoRGBToYIQ(r, g, b, &y, &i, &q);
 
     for(int phase = 0; phase < 4; phase++) {
-        Video8BitColorsToNTSC[color][phase] = RoNTSCYIQToDAC(y, i, q, phase / 4.0f);
+        Video8BitColorsToNTSC[color][phase] = RoNTSCYIQToDAC(y, i, q, phase / 4.0f, Video8BitModeBlack, Video8BitModeWhite);
     }
 }
 
@@ -65,9 +68,6 @@ int Video8BitModeNeedsColorburst()
 {
     return 1;
 }
-
-static uint8_t Video8BitModeBlack;
-static uint8_t Video8BitModeWhite;
 
 static int Video8BitModeInit([[maybe_unused]] void *private_data, uint8_t black_, uint8_t white_)
 {
@@ -88,7 +88,7 @@ static void Video8BitModeFini([[maybe_unused]] void *private_data)
     delete[] Video8BitFramebuffer;
 }
 
-__attribute__((hot,flatten)) void Video8BitModeFillRowBuffer([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
+__attribute__((hot,flatten)) void Video8BitModeFillRowBuffer([[maybe_unused]] int frameIndex, [[maybe_unused]] int lineWithinField, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
     if((rowNumber >= VIDEO_8_BIT_MODE_TOP) && (rowNumber < VIDEO_8_BIT_MODE_HEIGHT))
     {
@@ -180,7 +180,7 @@ void Set8BitVideoMode()
         HSVToRGB3f(h, s, v, &r, &g, &b);
         Video8BitSetPaletteEntry(i, r, g, b);
     }
-    RoNTSCSetMode(1, RO_VIDEO_ROW_SAMPLES_912, nullptr, Video8BitModeInit, Video8BitModeFini, Video8BitModeFillRowBuffer, Video8BitModeNeedsColorburst);
+    RoVideoSetMode(1, RO_VIDEO_ROW_SAMPLES_912, nullptr, Video8BitModeInit, Video8BitModeFini, Video8BitModeFillRowBuffer, Video8BitModeNeedsColorburst);
 }
 
 int SetPixel(int x, int y, int c)

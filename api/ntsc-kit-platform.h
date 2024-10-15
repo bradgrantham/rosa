@@ -11,6 +11,7 @@ extern "C" {
 void PlatformEnableNTSCScanout(NTSCLineConfig line_config, bool interlaced);
 void PlatformDisableNTSCScanout();
 uint8_t PlatformVoltageToDACValue(float voltage);
+int PlatformGetNTSCLineNumber();
 
 // Defined by NTSC-KIT, called by platform, preferably immediately after
 // beginning scanout of the *other* scanline buffer

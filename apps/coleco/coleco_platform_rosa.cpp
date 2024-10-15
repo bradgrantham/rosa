@@ -27,6 +27,9 @@ uint8_t *Pixmap256_192_4b_Framebuffer;
 
 uint8_t Pixmap256_192_4b_ColorsToNTSC[16][6];
 
+uint8_t blackValue;
+uint8_t whiteValue;
+
 // XXX TODO: convert original patent waveforms into YIQ
 // May not be able to get the real YIQ values because resistor
 // values are not listed in patent
@@ -36,7 +39,7 @@ void Pixmap256_192_4b_SetPaletteEntry(int color, uint8_t r, uint8_t g, uint8_t b
     RoRGBToYIQ(r / 255.0f, g / 255.0f, b / 255.0f, &y, &i, &q);
 
     for(int phase = 0; phase < 6; phase++) {
-        Pixmap256_192_4b_ColorsToNTSC[color][phase] = RoNTSCYIQToDAC(y, i, q, phase / 6.0);
+        Pixmap256_192_4b_ColorsToNTSC[color][phase] = RoNTSCYIQToDAC(y, i, q, phase / 6.0, blackValue, whiteValue);
     }
 }
 
@@ -54,7 +57,7 @@ int Pixmap256_192_4b_ModeNeedsColorburst()
     return 1;
 }
 
-static int Pixmap256_192_4b_ModeInit([[maybe_unused]] void *private_data, uint8_t, uint8_t)
+static int Pixmap256_192_4b_ModeInit([[maybe_unused]] void *private_data, uint8_t blackValue_, uint8_t whiteValue_)
 {
     Pixmap256_192_4b_Framebuffer = new(std::nothrow) uint8_t[256 / 2 * 192];
     if(Pixmap256_192_4b_Framebuffer == nullptr)
@@ -62,6 +65,8 @@ static int Pixmap256_192_4b_ModeInit([[maybe_unused]] void *private_data, uint8_
         // out of memory
         return 0;
     }
+    blackValue = blackValue_;
+    whiteValue = whiteValue_;
 
     return 1; // XXX should return 0 here if memory insufficient
 }
@@ -71,7 +76,7 @@ static void Pixmap256_192_4b_ModeFini([[maybe_unused]] void *private_data)
     delete[] Pixmap256_192_4b_Framebuffer;
 }
 
-__attribute__((hot,flatten)) void Pixmap256_192_4b_ModeFillRowBuffer([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
+__attribute__((hot,flatten)) void Pixmap256_192_4b_ModeFillRowBuffer([[maybe_unused]] int frameIndex, [[maybe_unused]] int lineWithinField, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
     int rowIndex = rowNumber - Pixmap256_192_4b_MODE_TOP;
     if((rowIndex >= 0) && (rowIndex < 192)) {
@@ -208,7 +213,7 @@ void Start(uint32_t& stereoU8SampleRate_, size_t& preferredAudioBufferSizeBytes_
         const uint8_t *c = TMS9918A::Colors[i];
         Pixmap256_192_4b_SetPaletteEntry(i, c[0], c[1], c[2]);
     }
-    RoNTSCSetMode(0, RO_VIDEO_ROW_SAMPLES_1368, nullptr, Pixmap256_192_4b_ModeInit, Pixmap256_192_4b_ModeFini, Pixmap256_192_4b_ModeFillRowBuffer, Pixmap256_192_4b_ModeNeedsColorburst);
+    RoVideoSetMode(0, RO_VIDEO_ROW_SAMPLES_1368, nullptr, Pixmap256_192_4b_ModeInit, Pixmap256_192_4b_ModeFini, Pixmap256_192_4b_ModeFillRowBuffer, Pixmap256_192_4b_ModeNeedsColorburst);
 
     RoAudioGetSamplingInfo(&audioSampleRate, &audioChunkLengthBytes);
     stereoU8SampleRate_ = audioSampleRate;
@@ -428,7 +433,7 @@ void Frame(const uint8_t* vdp_registers, const uint8_t* vdp_ram, uint8_t& vdp_st
         // previous_event_time = now;
     // }
 
-    RoNTSCWaitFrame();
+    RoVideoWaitNextField();
     vdp_status_result = TMS9918A::Create4BitPixmap(vdp_registers, vdp_ram, Pixmap256_192_4b_Framebuffer);
     if(save_next_screen)
     {

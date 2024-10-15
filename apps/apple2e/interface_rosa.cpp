@@ -472,7 +472,7 @@ int WozModeNeedsColorburst()
     return (WozModeDisplayMode != TEXT);
 }
 
-void WozModeFillRowBuffer(int frameIndex, int rowNumber, size_t maxSamples, uint8_t* rowBuffer)
+void WozModeFillRowBuffer(int frameIndex, [[maybe_unused]] int lineWithinField, int rowNumber, size_t maxSamples, uint8_t* rowBuffer)
 {
     int rowIndex = rowNumber - WOZ_MODE_TOP;
     DisplayMode mode = WozModeDisplayMode;
@@ -563,7 +563,7 @@ static void WozModeFini([[maybe_unused]] void *private_data)
 
 void start(bool, bool, bool, bool)
 {
-    RoNTSCSetMode(0, RO_VIDEO_ROW_SAMPLES_912, nullptr, WozModeInit, WozModeFini, WozModeFillRowBuffer, WozModeNeedsColorburst);
+    RoVideoSetMode(0, RO_VIDEO_ROW_SAMPLES_912, nullptr, WozModeInit, WozModeFini, WozModeFillRowBuffer, WozModeNeedsColorburst);
     RoAudioGetSamplingInfo(&audioSampleRate, &audioChunkLengthBytes);
     RoKeyRepeatInit(&keyRepeat);
     event_queue.push_back({KEYDOWN, CAPS_LOCK});

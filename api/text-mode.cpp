@@ -55,7 +55,7 @@ static void RoTextModeFini([[maybe_unused]] void *private_data)
     delete[] TextModeBuffer;
 }
 
-__attribute__((hot,flatten)) void RoTextModeFillRowBuffer([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
+__attribute__((hot,flatten)) void RoTextModeFillRowBuffer([[maybe_unused]] int frameIndex, [[maybe_unused]] int lineWithinField, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
     int fontScanlineHeight = font8x16Height * TextModeFontHeightScale;
 
@@ -116,5 +116,5 @@ void RoTextModeSetLine(int row, int column, uint8_t attributes, const char *stri
 
 void RoTextMode()
 {
-    RoNTSCSetMode(0, RO_VIDEO_ROW_SAMPLES_912, nullptr, RoTextModeInit, RoTextModeFini, RoTextModeFillRowBuffer, RoTextModeNeedsColorburst);
+    RoVideoSetMode(0, RO_VIDEO_ROW_SAMPLES_912, nullptr, RoTextModeInit, RoTextModeFini, RoTextModeFillRowBuffer, RoTextModeNeedsColorburst);
 }

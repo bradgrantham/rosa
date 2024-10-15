@@ -170,7 +170,7 @@ static void Trs80TextModeFini([[maybe_unused]] void *private_data)
 }
 
 // Called by the system to get the next row of video.
-__attribute__((hot,flatten)) void Trs80TextModeFillRowBuffer([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
+__attribute__((hot,flatten)) void Trs80TextModeFillRowBuffer([[maybe_unused]] int frameIndex, [[maybe_unused]] int lineWithinField, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
     int rowWithinTextArea = rowNumber - Trs80VerticalMargin;
     int charRow = rowWithinTextArea / Trs80FontHeight;
@@ -537,7 +537,7 @@ int trs80_main([[maybe_unused]] int argc, [[maybe_unused]] const char **argv)
     Trs80Machine *machine = new Trs80Machine;
 
     // Set up the display.
-    RoNTSCSetMode(0, RO_VIDEO_ROW_SAMPLES_912, nullptr, Trs80TextModeInit, Trs80TextModeFini, Trs80TextModeFillRowBuffer, Trs80TextModeNeedsColorburst);
+    RoVideoSetMode(0, RO_VIDEO_ROW_SAMPLES_912, nullptr, Trs80TextModeInit, Trs80TextModeFini, Trs80TextModeFillRowBuffer, Trs80TextModeNeedsColorburst);
 #if 0
     // For when debugging the character set.
     for (int i = 0; i < 256; i++) {
