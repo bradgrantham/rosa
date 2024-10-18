@@ -51,7 +51,7 @@ const static int SCREEN_X = 704 * SCREEN_SCALE;
 const static int SCREEN_Y = 480 * SCREEN_SCALE;
 
 int surfaceWidth = 704;
-int surfaceHeight = 480;
+int surfaceHeight = 240;
 
 void Start(uint32_t& stereoU8SampleRate, size_t& preferredAudioBufferSizeBytes)
 {
@@ -335,6 +335,9 @@ static void HandleEvents(void)
 // These correspond to the Rosa v1 8-bit DAC output
 #define DAC_VALUE_LIMIT 0xFF
 #define MAX_DAC_VOLTAGE 1.32f
+
+static uint8_t blackValue;
+static uint8_t whiteValue;
 
 uint8_t PlatformVoltageToDACValue(float voltage)
 {
@@ -701,6 +704,30 @@ std::thread* scanoutThread;
 
 void PlatformEnableNTSCScanout(NTSCLineConfig line_config, bool interlaced)
 {
+    SDL_FreeSurface(surface);
+    switch(line_config)
+    {
+        case NTSC_LINE_SAMPLES_910: {
+            surfaceWidth = 704;
+            break;
+        }
+        case NTSC_LINE_SAMPLES_912: {
+            surfaceWidth = 704;
+            break;
+        }
+        case NTSC_LINE_SAMPLES_1368: {
+            surfaceWidth = 1056;
+            break;
+        }
+    }
+    surfaceHeight = interlaced ? 480 : 240;
+
+    surface = SDL_CreateRGBSurface(0, surfaceWidth, surfaceHeight, 24, 0, 0, 0, 0);
+    if(!surface) {
+        printf("could not create surface\n");
+        exit(1);
+    }
+
     videoEnabled = true;
     videoLineConfig = line_config;
     videoInterlaced = interlaced;
@@ -718,88 +745,84 @@ void PlatformDisableNTSCScanout()
     delete scanoutThread;
 }
 
+void DecodeNTSCRow(NTSCLineConfig videoLineConfig, uint8_t* rowsamples, uint8_t* rowpixels)
+{
+    bool decodeColor = false; // TODO : detect colorburst
+
+    if(decodeColor) {
+        switch(videoLineConfig)
+        {
+            case NTSC_LINE_SAMPLES_910: {
+                int offset = static_cast<int>(910 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
+                // XXX this is wrong, need a phase shift per line
+                DecodeColorToRGB<4, 702>(rowsamples + offset, rowpixels);
+                break;
+            }
+            case NTSC_LINE_SAMPLES_912: {
+                int offset = static_cast<int>(912 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
+                DecodeColorToRGB<4, 704>(rowsamples + offset, rowpixels);
+                break;
+            }
+            case NTSC_LINE_SAMPLES_1368: {
+                int offset = static_cast<int>(1368 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
+                DecodeColorToRGB<6, 1056>(rowsamples + offset, rowpixels);
+                break;
+            }
+        }
+    } else {
+        int sampleCount;
+        int offset;
+        {
+            switch(videoLineConfig)
+            {
+                case NTSC_LINE_SAMPLES_910:
+                    offset = static_cast<int>(910 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
+                    sampleCount = 910 - offset;
+                    break;
+                case NTSC_LINE_SAMPLES_912:
+                    offset = static_cast<int>(912 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
+                    sampleCount = 912 - offset;
+                    break;
+                case NTSC_LINE_SAMPLES_1368:
+                    offset = static_cast<int>(1368 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
+                    sampleCount = 1368 - offset;
+                    break;
+            }
+        }
+        rowsamples += offset;
+        for(int x = 0; x < sampleCount; x++)
+        {
+            uint8_t *pixel = rowpixels + 3 * x;
+            uint8_t *sample = rowsamples + x;
+            uint8_t gray = (sample[0] - blackValue) * 255 / (whiteValue - blackValue);
+            pixel[0] = gray;
+            pixel[1] = gray;
+            pixel[2] = gray;
+        }
+    }
+}
+
 void Frame(unsigned char *samples)
 {
     if (SDL_MUSTLOCK(surface)) SDL_LockSurface(surface);
 
     auto before = std::chrono::system_clock::now();
-    bool decodeColor = false; // detect colorburst
     uint8_t* framebuffer = reinterpret_cast<uint8_t*>(surface->pixels);
 
     for(int y = 0; y < surfaceHeight; y++) {
-        uint8_t *rowpixels = framebuffer + 3 * y * surfaceWidth;
-        uint8_t *rowsamples = samples + y * SAMPLES_X;
-        switch(videoLineConfig)
+        int lineWithinSamples;
+        if(videoInterlaced)
         {
-            case NTSC_LINE_SAMPLES_910: {
-                rowsamples += static_cast<int>(910 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
-                break;
-            }
-            case NTSC_LINE_SAMPLES_912: {
-                rowsamples += static_cast<int>(912 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
-                break;
-            }
-            case NTSC_LINE_SAMPLES_1368: {
-                rowsamples += static_cast<int>(1368 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
-                break;
-            }
+            lineWithinSamples = 22 + (y % 2) * 263 + y / 2;
         }
+        else
+        {
+            lineWithinSamples = y + 22;
+        }
+        uint8_t *rowpixels = framebuffer + 3 * y * surfaceWidth;
+        uint8_t *rowsamples = samples + lineWithinSamples * SAMPLES_X;
         memset(rowpixels, 0, surfaceWidth * 3);
-        if(decodeColor) {
-            switch(videoLineConfig)
-            {
-                case NTSC_LINE_SAMPLES_910: {
-                    // XXX this is wrong, need a phase shift per line
-                    DecodeColorToRGB<4, 704>(rowsamples, rowpixels);
-                    break;
-                }
-                case NTSC_LINE_SAMPLES_912: {
-                    DecodeColorToRGB<4, 704>(rowsamples, rowpixels);
-                    break;
-                }
-                case NTSC_LINE_SAMPLES_1368: {
-                    DecodeColorToRGB<6, 1056>(rowsamples, rowpixels);
-                    break;
-                }
-            }
-        } else {
-            switch(videoLineConfig)
-            {
-                case NTSC_LINE_SAMPLES_910:
-                {
-                    for(int x = 0; x < 704; x++) {
-                        uint8_t *pixel = rowpixels + 3 * x;
-                        uint8_t *sample = rowsamples + x;
-                        pixel[0] = sample[0];
-                        pixel[1] = sample[0];
-                        pixel[2] = sample[0];
-                    }
-                    break;
-                }
-                case NTSC_LINE_SAMPLES_912:
-                {
-                    for(int x = 0; x < 704; x++) {
-                        uint8_t *pixel = rowpixels + 3 * x;
-                        uint8_t *sample = rowsamples + x;
-                        pixel[0] = sample[0];
-                        pixel[1] = sample[0];
-                        pixel[2] = sample[0];
-                    }
-                    break;
-                }
-                case NTSC_LINE_SAMPLES_1368:
-                {
-                    for(int x = 0; x < 1056; x++) {
-                        uint8_t *pixel = rowpixels + 3 * x;
-                        uint8_t *sample = rowsamples + x;
-                        pixel[0] = sample[0];
-                        pixel[1] = sample[0];
-                        pixel[2] = sample[0];
-                    }
-                    break;
-                }
-            }
-        }
+        DecodeNTSCRow(videoLineConfig, rowsamples, rowpixels);
     }
     auto after = std::chrono::system_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(after - before).count();
@@ -895,6 +918,8 @@ int main(int argc, char **argv)
     size_t preferredAudioBufferSizeBytes;
 
     InitColorDecodeTables(getenv("OFFSET") ? atof(getenv("OFFSET")) : 123.0f);
+    blackValue = PlatformVoltageToDACValue(NTSC_SYNC_BLACK_VOLTAGE);
+    whiteValue = PlatformVoltageToDACValue(NTSC_SYNC_WHITE_VOLTAGE);
     NTSCInitialize();
 
     const char *rootDirName = nullptr;

@@ -65,8 +65,14 @@ static int Pixmap256_192_4b_ModeInit([[maybe_unused]] void *private_data, uint8_
         // out of memory
         return 0;
     }
+
     blackValue = blackValue_;
     whiteValue = whiteValue_;
+
+    for(int i = 0; i < 16; i++) {
+        const uint8_t *c = TMS9918A::Colors[i];
+        Pixmap256_192_4b_SetPaletteEntry(i, c[0], c[1], c[2]);
+    }
 
     return 1; // XXX should return 0 here if memory insufficient
 }
@@ -209,10 +215,6 @@ RoKeyRepeatManager keyRepeat;
 void Start(uint32_t& stereoU8SampleRate_, size_t& preferredAudioBufferSizeBytes_)
 {
     RoKeyRepeatInit(&keyRepeat);
-    for(int i = 0; i < 16; i++) {
-        const uint8_t *c = TMS9918A::Colors[i];
-        Pixmap256_192_4b_SetPaletteEntry(i, c[0], c[1], c[2]);
-    }
     RoVideoSetMode(0, RO_VIDEO_ROW_SAMPLES_1368, nullptr, Pixmap256_192_4b_ModeInit, Pixmap256_192_4b_ModeFini, Pixmap256_192_4b_ModeFillRowBuffer, Pixmap256_192_4b_ModeNeedsColorburst);
 
     RoAudioGetSamplingInfo(&audioSampleRate, &audioChunkLengthBytes);

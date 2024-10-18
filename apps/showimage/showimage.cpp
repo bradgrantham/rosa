@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <string>
 #include <vector>
+#include <array>
 #include <cstring>
 #include "rocinante.h"
 #include "events.h"
@@ -34,6 +35,7 @@ static int initializer = []() -> int {
 
 uint8_t *Video8BitFramebuffer;
 
+std::array<std::array<uint8_t, 3>, 256> Video8BitPalette;
 uint8_t Video8BitColorsToNTSC[256][4];
 
 static uint8_t Video8BitModeBlack;
@@ -69,6 +71,40 @@ int Video8BitModeNeedsColorburst()
     return 1;
 }
 
+void HSVToRGB3f(float h, float s, float v, float *r, float *g, float *b)
+{
+    if(s < .00001) {
+        *r = v; *g = v; *b = v;
+    } else {
+        int i;
+        float p, q, t, f;
+
+        h = fmod(h, M_PI * 2);  /* wrap just in case */
+
+        i = floor(h / (M_PI / 3));
+
+        /*
+         * would have used "f = fmod(h, M_PI / 3);", but fmod seems to have
+         * a bug under Linux.
+         */
+
+        f = h / (M_PI / 3) - floor(h / (M_PI / 3));
+
+        p = v * (1 - s);
+        q = v * (1 - s * f);
+        t = v * (1 - s * (1 - f));
+        switch(i) {
+            case 0: *r = v; *g = t; *b = p; break;
+            case 1: *r = q; *g = v; *b = p; break;
+            case 2: *r = p; *g = v; *b = t; break;
+            case 3: *r = p; *g = q; *b = v; break;
+            case 4: *r = t; *g = p; *b = v; break;
+            case 5: *r = v; *g = p; *b = q; break;
+        }
+    }
+}
+
+
 static int Video8BitModeInit([[maybe_unused]] void *private_data, uint8_t black_, uint8_t white_)
 {
     Video8BitModeBlack = black_;
@@ -78,6 +114,20 @@ static int Video8BitModeInit([[maybe_unused]] void *private_data, uint8_t black_
     {
         // out of memory
         return 0;
+    }
+
+    for(int i = 0; i < 256; i++)
+    {
+        // H3S2V3
+        float h = ((i >> 5) & 7) / 7.0f * M_PI * 2;
+        float s = ((i >> 3) & 3) / 3.0f;
+        float v = ((i >> 0) & 7) / 7.0f;
+        float r, g, b;
+        HSVToRGB3f(h, s, v, &r, &g, &b);
+        Video8BitSetPaletteEntry(i, r, g, b);
+        Video8BitPalette[i][0] = r * 255;
+        Video8BitPalette[i][1] = g * 255;
+        Video8BitPalette[i][2] = b * 255;
     }
 
     return 1;
@@ -135,51 +185,8 @@ __attribute__((hot,flatten)) void Video8BitModeFillRowBuffer([[maybe_unused]] in
      {255, 0, 255},
 };
 
-void HSVToRGB3f(float h, float s, float v, float *r, float *g, float *b)
-{
-    if(s < .00001) {
-        *r = v; *g = v; *b = v;
-    } else {
-        int i;
-        float p, q, t, f;
-
-        h = fmod(h, M_PI * 2);  /* wrap just in case */
-
-        i = floor(h / (M_PI / 3));
-
-        /*
-         * would have used "f = fmod(h, M_PI / 3);", but fmod seems to have
-         * a bug under Linux.
-         */
-
-        f = h / (M_PI / 3) - floor(h / (M_PI / 3));
-
-        p = v * (1 - s);
-        q = v * (1 - s * f);
-        t = v * (1 - s * (1 - f));
-        switch(i) {
-            case 0: *r = v; *g = t; *b = p; break;
-            case 1: *r = q; *g = v; *b = p; break;
-            case 2: *r = p; *g = v; *b = t; break;
-            case 3: *r = p; *g = q; *b = v; break;
-            case 4: *r = t; *g = p; *b = v; break;
-            case 5: *r = v; *g = p; *b = q; break;
-        }
-    }
-}
-
 void Set8BitVideoMode()
 {
-    for(int i = 0; i < 256; i++)
-    {
-        // H3S2V3
-        float h = ((i >> 5) & 7) / 7.0f * M_PI * 2;
-        float s = ((i >> 3) & 3) / 3.0f;
-        float v = ((i >> 0) & 7) / 7.0f;
-        float r, g, b;
-        HSVToRGB3f(h, s, v, &r, &g, &b);
-        Video8BitSetPaletteEntry(i, r, g, b);
-    }
     RoVideoSetMode(1, RO_VIDEO_ROW_SAMPLES_912, nullptr, Video8BitModeInit, Video8BitModeFini, Video8BitModeFillRowBuffer, Video8BitModeNeedsColorburst);
 }
 
@@ -206,31 +213,12 @@ enum {
     MAX_FILE_ROW_PIXELS = 4096,
 };
 
-int FindClosestColor(unsigned char palette[][3], int paletteSize, int r, int g, int b)
+int FindClosestColor(const std::array<std::array<uint8_t, 3>, 256> & palette, int r, int g, int b)
 {
-#if 0
-    float bestDiff = 200000;  // skosh above the maximum difference, 3 * 65536
-    int c = -1;
-
-    for(int i = 0; i < paletteSize; i++) {
-
-        float pr = (unsigned int)palette[i][0];
-        float pg = (unsigned int)palette[i][1];
-        float pb = (unsigned int)palette[i][2];
-        float diff = (pr - r) * (pr - r) + (pg - g) * (pg - g) + (pb - b) * (pb - b);
-        if(diff == 0) {
-            return i;
-        }
-        if(diff < bestDiff) {
-            bestDiff = diff;
-            c = i;
-        }
-    }
-#else
     int bestDiff = 200000;  // skosh above the maximum difference, 3 * 65536
     int c = -1;
 
-    for(int i = 0; i < paletteSize; i++) {
+    for(size_t i = 0; i < palette.size(); i++) {
 
         int pr = (unsigned int)palette[i][0];
         int pg = (unsigned int)palette[i][1];
@@ -244,7 +232,6 @@ int FindClosestColor(unsigned char palette[][3], int paletteSize, int r, int g, 
             c = i;
         }
     }
-#endif
     return c;
 }
 
@@ -272,24 +259,6 @@ int main([[maybe_unused]] int argc, const char **argv)
         }
     }
 
-    int paletteSize = 256;
-    unsigned char (*palette)[3] = (unsigned char (*)[3])malloc(sizeof(palette[0]) * paletteSize);
-    if(palette == NULL) {
-        printf("failed to allocate palette\n");
-        exit(1);
-    }
-    for(int i = 0; i < paletteSize; i++)
-    {
-        // H3S2V3
-        float h = ((i >> 5) & 7) / 7.0f * M_PI * 2;
-        float s = ((i >> 3) & 3) / 3.0f;
-        float v = ((i >> 0) & 7) / 7.0f;
-        float r, g, b;
-        HSVToRGB3f(h, s, v, &r, &g, &b);
-        palette[i][0] = r * 255;
-        palette[i][1] = g * 255;
-        palette[i][2] = b * 255;
-    }
 
     FILE *fp;
     fp = fopen (filename, "rb");
@@ -308,7 +277,7 @@ int main([[maybe_unused]] int argc, const char **argv)
 
     if((ppmtype != 5) && (ppmtype != 6)) {
         printf("unsupported image type %d for \"%s\"\n", ppmtype, filename);
-        free(palette);
+        // Video8BitPalette.clear();
         fclose(fp);
         exit(1);
     }
@@ -316,7 +285,7 @@ int main([[maybe_unused]] int argc, const char **argv)
     if(width > MAX_FILE_ROW_PIXELS) {
 	printf("ERROR: width %d of image in \"%s\" is too large for static row of %u pixels\n",
             width, filename, MAX_SCREEN_ROW_PIXELS);
-        free(palette);
+        // Video8BitPalette.clear();
         fclose(fp);
         exit(1);
     }
@@ -325,7 +294,7 @@ int main([[maybe_unused]] int argc, const char **argv)
     rowRGB = (unsigned char (*)[3]) malloc(sizeof(rowRGB[0]) * MAX_FILE_ROW_PIXELS);
     if(rowRGB == NULL) {
         printf("failed to allocate row for pixel data\n");
-        free(palette);
+        // Video8BitPalette.clear();
         fclose(fp);
         exit(1);
     }
@@ -336,7 +305,7 @@ int main([[maybe_unused]] int argc, const char **argv)
     if(rowError == NULL) {
         printf("failed to allocate row for error data\n");
         free(rowRGB);
-        free(palette);
+        // Video8BitPalette.clear();
         fclose(fp);
         exit(1);
     }
@@ -353,7 +322,7 @@ int main([[maybe_unused]] int argc, const char **argv)
                 if(fread(rowRGB, 3, width, fp) != (size_t)width)
                 {
                     printf("ERROR: couldn't read row %d from \"%s\"\n", srcRow, filename);
-                    free(palette);
+                    // Video8BitPalette.clear();
                     free(rowError);
                     free(rowRGB);
                     exit(1);
@@ -364,7 +333,7 @@ int main([[maybe_unused]] int argc, const char **argv)
                 if(fread(rowRGB, 1, width, fp) != (size_t)width)
                 {
                     printf("ERROR: couldn't read row %d from \"%s\"\n", srcRow, filename);
-                    free(palette);
+                    // Video8BitPalette.clear();
                     free(rowError);
                     free(rowRGB);
                     exit(1);
@@ -398,7 +367,7 @@ int main([[maybe_unused]] int argc, const char **argv)
             }
 
             // Find the closest color in our palette
-            int c = FindClosestColor(palette, paletteSize, correctedRGB[0], correctedRGB[1], correctedRGB[2]);
+            int c = FindClosestColor(Video8BitPalette, correctedRGB[0], correctedRGB[1], correctedRGB[2]);
 
             SetPixel(x, y, c);
 
@@ -406,7 +375,7 @@ int main([[maybe_unused]] int argc, const char **argv)
             // and distribute it a la Floyd-Steinberg
             int errorFixed8[3];
             for(int i = 0; i < 3; i++) {
-                errorFixed8[i] = 255 * (correctedRGB[i] - palette[c][i]);
+                errorFixed8[i] = 255 * (correctedRGB[i] - Video8BitPalette[c][i]);
             }
             for(int i = 0; i < 3; i++) {
                 errorThisRowFixed8[x + 1][i] += errorFixed8[i] * 7 / 16;
@@ -426,7 +395,7 @@ int main([[maybe_unused]] int argc, const char **argv)
     }
 
     fclose(fp);
-    free(palette);
+    // Video8BitPalette.clear();
     free(rowError);
     free(rowRGB);
 
