@@ -1769,7 +1769,6 @@ int coleco_main(int argc, const char **argv);
 #define main coleco_main
 
 static volatile int register_app_initializer = []() -> int {
-    printf("%s\n", __FILE__);
     LauncherRegisterApp("Colecovision Emulator", "emulator", "a Coleco cartridge", "coleco", "", {"coleco/COLECO.ROM"}, {}, coleco_main);
     return 1;
 }();
