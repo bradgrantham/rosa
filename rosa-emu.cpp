@@ -437,7 +437,7 @@ struct Averager
 };
 
 template <int MULTIPLE, int SAMPLES>
-void DecodeColorToRGB(uint8_t *samples, uint8_t *rgb)
+void DecodeColorToRGB(const uint8_t *samples, uint8_t *rgb)
 {
     float voltage = PlatformDACValueToVoltage(samples[0]);
     float value = (voltage - NTSC_SYNC_BLACK_VOLTAGE) / (NTSC_SYNC_WHITE_VOLTAGE - NTSC_SYNC_BLACK_VOLTAGE);
@@ -457,13 +457,18 @@ void DecodeColorToRGB(uint8_t *samples, uint8_t *rgb)
 
         y = value_averaged;
         float signal = value - y;
-        if(MULTIPLE == 4) {
-            i = signal * carrierIQ.at(idx % MULTIPLE);
-            q = signal * carrierIQ.at((idx + 3) % MULTIPLE); // XXX 3 means -270 degrees out of phase?
-        } else if(MULTIPLE == 6) {
+        if(MULTIPLE == 4)
+        {
+            i = signal * carrierIQ.at(idx % MULTIPLE); // this is the cosine component
+            q = signal * carrierIQ.at((idx + 3) % MULTIPLE); // 3 means -270 degrees out of phase, so this is the sine component
+        }
+        else if(MULTIPLE == 6)
+        {
             i = signal * sinf(carrierOffsetRadians + M_PI / 3.0 * (idx % MULTIPLE));
             q = signal * sinf(carrierOffsetRadians + M_PI / 3.0 * (idx % MULTIPLE) - M_PI / 2.0);
-        } else {
+        }
+        else
+        {
             abort(); // XXX should have a specialization or trait or something that would just cause an error here
         }
         y_averaged.update(y);
@@ -745,26 +750,33 @@ void PlatformDisableNTSCScanout()
     delete scanoutThread;
 }
 
-void DecodeNTSCRow(NTSCLineConfig videoLineConfig, uint8_t* rowsamples, uint8_t* rowpixels)
+std::tuple<bool, float> DetectColor(NTSCLineConfig videoLineConfig, const uint8_t* rowsamples)
 {
-    bool decodeColor = false; // TODO : detect colorburst
+    (void)videoLineConfig;
+    (void)rowsamples;
+    return {true, 0.0f};
+}
+
+void DecodeNTSCRow(NTSCLineConfig videoLineConfig, const uint8_t* rowsamples, uint8_t* rowpixels)
+{
+    const auto [decodeColor, phase] = DetectColor(videoLineConfig, rowsamples); // TODO : detect colorburst
 
     if(decodeColor) {
         switch(videoLineConfig)
         {
             case NTSC_LINE_SAMPLES_910: {
-                int offset = static_cast<int>(910 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
+                int offset = 160; // static_cast<int>(910 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
                 // XXX this is wrong, need a phase shift per line
                 DecodeColorToRGB<4, 702>(rowsamples + offset, rowpixels);
                 break;
             }
             case NTSC_LINE_SAMPLES_912: {
-                int offset = static_cast<int>(912 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
+                int offset = 160; // static_cast<int>(912 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
                 DecodeColorToRGB<4, 704>(rowsamples + offset, rowpixels);
                 break;
             }
             case NTSC_LINE_SAMPLES_1368: {
-                int offset = static_cast<int>(1368 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
+                int offset = 240; // static_cast<int>(1368 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
                 DecodeColorToRGB<6, 1056>(rowsamples + offset, rowpixels);
                 break;
             }
@@ -775,17 +787,21 @@ void DecodeNTSCRow(NTSCLineConfig videoLineConfig, uint8_t* rowsamples, uint8_t*
         {
             switch(videoLineConfig)
             {
+// hsync, back, left, all before visible, visible, right, front
+// 67, 67, 25, 159, 705, 25, 21
+// 67, 67, 25, 159, 707, 25, 21
+// 100, 100, 37, 237, 1062, 37, 32
                 case NTSC_LINE_SAMPLES_910:
-                    offset = static_cast<int>(910 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
-                    sampleCount = 910 - offset;
+                    offset = 160; // static_cast<int>(910 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
+                    sampleCount = 704; // 910 - offset;
                     break;
                 case NTSC_LINE_SAMPLES_912:
-                    offset = static_cast<int>(912 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
-                    sampleCount = 912 - offset;
+                    offset = 160; // static_cast<int>(912 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
+                    sampleCount = 704; // 912 - offset;
                     break;
                 case NTSC_LINE_SAMPLES_1368:
-                    offset = static_cast<int>(1368 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
-                    sampleCount = 1368 - offset;
+                    offset = 240; // static_cast<int>(1368 * (NTSC_HOR_SYNC_DUR + NTSC_BACKPORCH));
+                    sampleCount = 1056; // 1368 - offset;
                     break;
             }
         }
@@ -793,7 +809,7 @@ void DecodeNTSCRow(NTSCLineConfig videoLineConfig, uint8_t* rowsamples, uint8_t*
         for(int x = 0; x < sampleCount; x++)
         {
             uint8_t *pixel = rowpixels + 3 * x;
-            uint8_t *sample = rowsamples + x;
+            const uint8_t *sample = rowsamples + x;
             uint8_t gray = (sample[0] - blackValue) * 255 / (whiteValue - blackValue);
             pixel[0] = gray;
             pixel[1] = gray;
@@ -807,9 +823,10 @@ void Frame(unsigned char *samples)
     if (SDL_MUSTLOCK(surface)) SDL_LockSurface(surface);
 
     auto before = std::chrono::system_clock::now();
-    uint8_t* framebuffer = reinterpret_cast<uint8_t*>(surface->pixels);
+    auto framebuffer = reinterpret_cast<uint8_t*>(surface->pixels);
 
-    for(int y = 0; y < surfaceHeight; y++) {
+    for(int y = 0; y < surfaceHeight; y++)
+    {
         int lineWithinSamples;
         if(videoInterlaced)
         {
@@ -820,7 +837,7 @@ void Frame(unsigned char *samples)
             lineWithinSamples = y + 22;
         }
         uint8_t *rowpixels = framebuffer + 3 * y * surfaceWidth;
-        uint8_t *rowsamples = samples + lineWithinSamples * SAMPLES_X;
+        const uint8_t *rowsamples = samples + lineWithinSamples * SAMPLES_X;
         memset(rowpixels, 0, surfaceWidth * 3);
         DecodeNTSCRow(videoLineConfig, rowsamples, rowpixels);
     }
