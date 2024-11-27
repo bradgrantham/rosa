@@ -2309,327 +2309,334 @@ int apple2_main(int argc, const char **argv)
     const char *map_name = NULL;
     bool mute = false;
 
-    while((argc > 0) && (argv[0][0] == '-')) {
-	if(strcmp(argv[0], "-mute") == 0) {
-            mute = true;
-            argv++;
-            argc--;
-	} else if(strcmp(argv[0], "-debugger") == 0) {
-            debugging = true;
-            argv++;
-            argc--;
-	} else if(strcmp(argv[0], "-diskII") == 0) {
-            if(argc < 4) {
-                fprintf(stderr, "-diskII option requires a ROM image filename and two floppy image names (or \"-\" to leave drive empty).\n");
+    try {
+
+        while((argc > 0) && (argv[0][0] == '-')) {
+            if(strcmp(argv[0], "-mute") == 0) {
+                mute = true;
+                argv++;
+                argc--;
+            } else if(strcmp(argv[0], "-debugger") == 0) {
+                debugging = true;
+                argv++;
+                argc--;
+            } else if(strcmp(argv[0], "-diskII") == 0) {
+                if(argc < 4) {
+                    fprintf(stderr, "-diskII option requires a ROM image filename and two floppy image names (or \"-\" to leave drive empty).\n");
+                    return 1;
+                }
+                diskII_rom_name = argv[1];
+                floppy1_name = argv[2];
+                floppy2_name = argv[3];
+                argv += 4;
+                argc -= 4;
+            } else if(strcmp(argv[0], "-backspace-is-delete") == 0) {
+                delete_is_left_arrow = false;
+                argv += 1;
+                argc -= 1;
+            } else if(strcmp(argv[0], "-fast") == 0) {
+                run_fast = true;
+                argv += 1;
+                argc -= 1;
+            } else if(strcmp(argv[0], "-d") == 0) {
+                debug = atoi(argv[1]);
+                if(argc < 2) {
+                    fprintf(stderr, "-d option requires a debugger mask value.\n");
+                    return 1;
+                }
+                argv += 2;
+                argc -= 2;
+            } else if(strcmp(argv[0], "-map") == 0) {
+                if(argc < 2) {
+                    fprintf(stderr, "-map option requires an ld65 map filename.\n");
+                    return 1;
+                }
+                map_name = argv[1];
+                argv += 2;
+                argc -= 2;
+            } else if(
+                    (strcmp(argv[0], "-help") == 0) ||
+                    (strcmp(argv[0], "-h") == 0) ||
+                    (strcmp(argv[0], "-?") == 0))
+            {
+                usage(progname);
+                return 0;
+            } else {
+                fprintf(stderr, "unknown parameter \"%s\"\n", argv[0]);
+                usage(progname);
                 return 1;
             }
-            diskII_rom_name = argv[1];
-            floppy1_name = argv[2];
-            floppy2_name = argv[3];
-            argv += 4;
-            argc -= 4;
-	} else if(strcmp(argv[0], "-backspace-is-delete") == 0) {
-            delete_is_left_arrow = false;
-            argv += 1;
-            argc -= 1;
-	} else if(strcmp(argv[0], "-fast") == 0) {
-            run_fast = true;
-            argv += 1;
-            argc -= 1;
-	} else if(strcmp(argv[0], "-d") == 0) {
-            debug = atoi(argv[1]);
-            if(argc < 2) {
-                fprintf(stderr, "-d option requires a debugger mask value.\n");
-                return 1;
-            }
-            argv += 2;
-            argc -= 2;
-	} else if(strcmp(argv[0], "-map") == 0) {
-            if(argc < 2) {
-                fprintf(stderr, "-map option requires an ld65 map filename.\n");
-                return 1;
-            }
-            map_name = argv[1];
-            argv += 2;
-            argc -= 2;
-        } else if(
-            (strcmp(argv[0], "-help") == 0) ||
-            (strcmp(argv[0], "-h") == 0) ||
-            (strcmp(argv[0], "-?") == 0))
-        {
+        }
+
+        if(argc < 1) {
             usage(progname);
-            return 0;
-	} else {
-	    fprintf(stderr, "unknown parameter \"%s\"\n", argv[0]);
-            usage(progname);
-	    return 1;
-	}
-    }
-
-    if(argc < 1) {
-        usage(progname);
-        return 1;
-    }
-
-    const char *romname = argv[0];
-    uint8_t b[32768];
-
-    if(!read_blob(romname, b, sizeof(b))) {
-        return 1;
-    }
-
-    uint8_t diskII_rom[256];
-    if(diskII_rom_name != NULL) {
-        if(!read_blob(diskII_rom_name, diskII_rom, sizeof(diskII_rom)))
-            return 1;
-    }
-
-    if(map_name != NULL) {
-        if(!read_map(map_name))
-            return 1;
-    }
-
-    APPLE2Einterface::start(run_fast, diskII_rom_name != NULL, floppy1_name != NULL, floppy2_name != NULL);
-
-    MAINboard* mainboard;
-
-    MAINboard::display_write_func display = [](uint16_t addr, bool aux, uint8_t data)->bool{return APPLE2Einterface::write(addr, aux, data);};
-
-    MAINboard::get_paddle_func paddle = [](int num)->tuple<float, bool>{return APPLE2Einterface::get_paddle(num);};
-
-    (void)mute;
-    MAINboard::audio_flush_func audio = [](uint8_t *buf, size_t size){ if(!run_fast) APPLE2Einterface::enqueue_audio_samples(buf, size); };
-
-    mainboard = new MAINboard(clk, b, display, APPLE2Einterface::get_audio_sample_rate(), APPLE2Einterface::get_preferred_audio_buffer_size_samples(), audio, paddle);
-    bus.board = mainboard;
-    bus.reset();
-
-    if(diskII_rom_name != NULL) {
-
-        if((strcmp(floppy1_name, "-") == 0) || 
-           (strcmp(floppy1_name, "none") == 0) || 
-           (strcmp(floppy1_name, "") == 0) )
-            floppy1_name = NULL;
-
-        if((strcmp(floppy2_name, "-") == 0) || 
-           (strcmp(floppy2_name, "none") == 0) || 
-           (strcmp(floppy2_name, "") == 0) )
-            floppy2_name = NULL;
-
-        try {
-            DISKIIboard::floppy_activity_func activity = [](int num, bool activity){APPLE2Einterface::show_floppy_activity(num, activity);};
-            diskIIboard = new (std::nothrow) DISKIIboard(diskII_rom, floppy1_name, floppy2_name, activity);
-            if(!diskIIboard) {
-                printf("failed to new DISKIIboard\n");
-            }
-            mainboard->boards.push_back(diskIIboard);
-            mockingboard = new Mockingboard();
-            mainboard->boards.push_back(mockingboard);
-        } catch(const char *msg) {
-            cerr << msg << endl;
             return 1;
         }
-    }
 
-    CPU6502<system_clock, bus_frontend> cpu(clk, bus);
+        const char *romname = argv[0];
+        static uint8_t b[32768];
 
-    atexit(cleanup);
+        if(!read_blob(romname, b, sizeof(b))) {
+            return 1;
+        }
+
+        uint8_t diskII_rom[256];
+        if(diskII_rom_name != NULL) {
+            if(!read_blob(diskII_rom_name, diskII_rom, sizeof(diskII_rom)))
+                return 1;
+        }
+
+        if(map_name != NULL) {
+            if(!read_map(map_name))
+                return 1;
+        }
+
+        APPLE2Einterface::start(run_fast, diskII_rom_name != NULL, floppy1_name != NULL, floppy2_name != NULL);
+
+        MAINboard* mainboard;
+
+        MAINboard::display_write_func display = [](uint16_t addr, bool aux, uint8_t data)->bool{return APPLE2Einterface::write(addr, aux, data);};
+
+        MAINboard::get_paddle_func paddle = [](int num)->tuple<float, bool>{return APPLE2Einterface::get_paddle(num);};
+
+        (void)mute;
+        MAINboard::audio_flush_func audio = [](uint8_t *buf, size_t size){ if(!run_fast) APPLE2Einterface::enqueue_audio_samples(buf, size); };
+
+        mainboard = new MAINboard(clk, b, display, APPLE2Einterface::get_audio_sample_rate(), APPLE2Einterface::get_preferred_audio_buffer_size_samples(), audio, paddle);
+        bus.board = mainboard;
+        bus.reset();
+
+        if(diskII_rom_name != NULL) {
+
+            if((strcmp(floppy1_name, "-") == 0) || 
+                    (strcmp(floppy1_name, "none") == 0) || 
+                    (strcmp(floppy1_name, "") == 0) )
+                floppy1_name = NULL;
+
+            if((strcmp(floppy2_name, "-") == 0) || 
+                    (strcmp(floppy2_name, "none") == 0) || 
+                    (strcmp(floppy2_name, "") == 0) )
+                floppy2_name = NULL;
+
+            try {
+                DISKIIboard::floppy_activity_func activity = [](int num, bool activity){APPLE2Einterface::show_floppy_activity(num, activity);};
+                diskIIboard = new (std::nothrow) DISKIIboard(diskII_rom, floppy1_name, floppy2_name, activity);
+                if(!diskIIboard) {
+                    printf("failed to new DISKIIboard\n");
+                }
+                mainboard->boards.push_back(diskIIboard);
+                mockingboard = new Mockingboard();
+                mainboard->boards.push_back(mockingboard);
+            } catch(const char *msg) {
+                cerr << msg << endl;
+                return 1;
+            }
+        }
+
+        CPU6502<system_clock, bus_frontend> cpu(clk, bus);
+
+        atexit(cleanup);
 
 #ifdef SUPPORT_FAKE_6502
-    if(use_fake6502)
-        reset6502();
+        if(use_fake6502)
+            reset6502();
 #endif
 
-    chrono::time_point<chrono::system_clock> then = std::chrono::system_clock::now();
-    chrono::time_point<chrono::system_clock> cpu_speed_then = std::chrono::system_clock::now();
-    clk_t cpu_previous_cycles = 0;
-    averaged_sequence<float, 20> cpu_speed_averaged;
+        chrono::time_point<chrono::system_clock> then = std::chrono::system_clock::now();
+        chrono::time_point<chrono::system_clock> cpu_speed_then = std::chrono::system_clock::now();
+        clk_t cpu_previous_cycles = 0;
+        averaged_sequence<float, 20> cpu_speed_averaged;
 
-    int audio_sample_rate = APPLE2Einterface::get_audio_sample_rate();
-    size_t audio_buffer_size = APPLE2Einterface::get_preferred_audio_buffer_size_samples();
+        int audio_sample_rate = APPLE2Einterface::get_audio_sample_rate();
+        size_t audio_buffer_size = APPLE2Einterface::get_preferred_audio_buffer_size_samples();
 
-    std::set<uint16_t> breakpoints;
+        std::set<uint16_t> breakpoints;
 
-    while(1) {
-        if(!debugging) {
+        while(1) {
+            if(!debugging) {
 
-            if(process_events(mainboard, bus, cpu) == APPLE2Einterface::QUIT) {
-                break;
-            }
-
-            uint32_t clocks_per_slice;
-            if(pause_cpu)
-                clocks_per_slice = 0;
-            else {
-                if(run_rate_limited) {
-                    clocks_per_slice = machine_clock_rate / 1000 * rate_limit_millis; 
-                } else if(run_fast) {
-                    clocks_per_slice = machine_clock_rate / 50; // 5; 
-                } else {
-                    // clocks_per_slice = millis_per_slice * machine_clock_rate / 1000 * 1.05;
-                    // clocks_per_slice = millis_per_slice * machine_clock_rate / 1000 * 1.05 ;
-                    clocks_per_slice = (machine_clock_rate + audio_sample_rate - 1)/ audio_sample_rate * audio_buffer_size;
-                }
-            }
-            clk_t prev_clock = clk;
-            chrono::time_point<chrono::system_clock> housekeeping_prev = std::chrono::system_clock::now();
-            while(clk - prev_clock < clocks_per_slice) {
-                if(debug & DEBUG_DECODE) {
-                    string dis = read_bus_and_disassemble(bus,
-#ifdef SUPPORT_FAKE_6502
-                            use_fake6502 ? pc :
-#endif
-                            cpu.pc);
-                    printf("%s\n", dis.c_str());
-                }
-#ifdef SUPPORT_FAKE_6502
-                if(use_fake6502) {
-                    clockticks6502 = 0;
-                    step6502();
-                    clk.add_cpu_cycles(clockticks6502);
-                } else
-#endif
-                {
-                    cpu.cycle();
-                    if(debug & DEBUG_STATE) {
-                        print_cpu_state(cpu);
-                    }
-                }
-#if defined(ROSA)
-                chrono::time_point<chrono::system_clock> housekeeping_now = std::chrono::system_clock::now();
-                auto housekeeping_micros = chrono::duration_cast<chrono::microseconds>(housekeeping_now - cpu_speed_then);
-                if(housekeeping_micros.count() > 1000) {
-                    RoDoHousekeeping();
-                    housekeeping_prev = housekeeping_now;
-                }
-#endif
-                if(debug & DEBUG_CLOCK) {
-                    printf("clock = %" PRIu32 ", %" PRIu32 "\n", (uint32_t)(clk / (1LLU << 32)), (uint32_t)(clk % (1LLU << 32)));
-                }
-            }
-            mainboard->sync();
-
-            chrono::time_point<chrono::system_clock> cpu_speed_now = std::chrono::system_clock::now();
-
-            auto cpu_elapsed_seconds = chrono::duration_cast<chrono::duration<float> >(cpu_speed_now - cpu_speed_then);
-            cpu_speed_then = cpu_speed_now;
-
-            clk_t cpu_elapsed_cycles = clk.clock_cpu - cpu_previous_cycles;
-            cpu_previous_cycles = clk.clock_cpu;
-
-            float cpu_speed = cpu_elapsed_cycles / cpu_elapsed_seconds.count();
-            cpu_speed_averaged.add(cpu_speed);
-
-            APPLE2Einterface::iterate(mode_history, clk.clock_cpu, cpu_speed_averaged.get() / 1000000.0f);
-            mode_history.clear();
-
-            chrono::time_point<chrono::system_clock> now = std::chrono::system_clock::now();
-
-            auto elapsed_millis = chrono::duration_cast<chrono::milliseconds>(now - then);
-
-            if(!run_fast || pause_cpu) {
-                sleep_for(clocks_per_slice * 1000 / machine_clock_rate - elapsed_millis.count());
-            }
-
-            then = now;
-
-        } else {
-
-            int steps = 1;
-            printf("> ");
-            char line[512];
-            if(fgets(line, sizeof(line) - 1, stdin) == NULL) {
-                exit(0);
-            }
-            line[strlen(line) - 1] = '\0';
-            if(strcmp(line, "go") == 0) {
-                printf("continuing\n");
-                debugging = false;
-                continue;
-            } else if(strncmp(line, "step", 4) == 0) {
-                if(line[5] != '\0') {
-                    steps = atoi(line + 5);
-                    printf("run for %d steps\n", steps);
-                }
-            } else if(strncmp(line, "break", 5) == 0) {
-                if(line[6] != '\0') {
-                    uint16_t addr = strtoul(line + 5, NULL, 0);
-                    printf("breakpoint at 0x%04X\n", addr);
-                    breakpoints.insert(addr);
-                } else {
-                    printf("expected breakpoint address\n");
-                }
-                continue;
-            } else if(strcmp(line, "fast") == 0) {
-                printf("run flat out\n");
-                run_fast = true;
-                continue;
-            } else if(strcmp(line, "slow") == 0) {
-                printf("run 1mhz\n");
-                run_fast = false;
-                continue;
-            } else if(strcmp(line, "banking") == 0) {
-                printf("abort on any banking\n");
-                exit_on_banking = true;
-                continue;
-            } else if(strncmp(line, "debug", 5) == 0) {
-                sscanf(line + 6, "%" SCNu32, &debug);
-                printf("debug set to %02" PRIu32 "\n", debug);
-                continue;
-            } else if(strcmp(line, "reset") == 0) {
-                printf("machine reset.\n");
-                bus.reset();
-                cpu.reset();
-                continue;
-            } else if(strcmp(line, "reboot") == 0) {
-                printf("CPU rebooted (NMI).\n");
-                bus.reset();
-                cpu.nmi();
-                continue;
-            }
-            for(int i = 0; i < steps; i++) {
-                if(debug & DEBUG_DECODE) {
-                    string dis = read_bus_and_disassemble(bus,
-#ifdef SUPPORT_FAKE_6502
-                            use_fake6502 ? pc :
-#endif
-                            cpu.pc);
-                    printf("%s\n", dis.c_str());
-                }
-
-#ifdef SUPPORT_FAKE_6502
-                if(use_fake6502) {
-                    clockticks6502 = 0;
-                    step6502();
-                    clk.add_cpu_cycles(clockticks6502);
-                } else
-#endif
-                {
-                    cpu.cycle();
-                    if(debug & DEBUG_STATE)
-                        print_cpu_state(cpu);
-                }
-                if((i % 10000) == 0) {
-                    mainboard->sync();
-                }
-                if((i % 100000) == 0) {
-                    APPLE2Einterface::iterate(mode_history, clk.clock_cpu, 1.023);
-                    mode_history.clear();
-                }
-
-                uint16_t pcnow = 
-#ifdef SUPPORT_FAKE_6502
-                    use_fake6502 ? pc :
-#endif
-                    cpu.pc;
-                printf("%04X, %zd\n", pcnow, breakpoints.count(pcnow));
-                if(breakpoints.count(pcnow) > 0) {
-                    printf("break at 0x%4X\n", pcnow);
+                if(process_events(mainboard, bus, cpu) == APPLE2Einterface::QUIT) {
                     break;
                 }
-            }
 
+                uint32_t clocks_per_slice;
+                if(pause_cpu)
+                    clocks_per_slice = 0;
+                else {
+                    if(run_rate_limited) {
+                        clocks_per_slice = machine_clock_rate / 1000 * rate_limit_millis; 
+                    } else if(run_fast) {
+                        clocks_per_slice = machine_clock_rate / 50; // 5; 
+                    } else {
+                        // clocks_per_slice = millis_per_slice * machine_clock_rate / 1000 * 1.05;
+                        // clocks_per_slice = millis_per_slice * machine_clock_rate / 1000 * 1.05 ;
+                        clocks_per_slice = (machine_clock_rate + audio_sample_rate - 1)/ audio_sample_rate * audio_buffer_size;
+                    }
+                }
+                clk_t prev_clock = clk;
+                chrono::time_point<chrono::system_clock> housekeeping_prev = std::chrono::system_clock::now();
+                while(clk - prev_clock < clocks_per_slice) {
+                    if(debug & DEBUG_DECODE) {
+                        string dis = read_bus_and_disassemble(bus,
+#ifdef SUPPORT_FAKE_6502
+                                use_fake6502 ? pc :
+#endif
+                                cpu.pc);
+                        printf("%s\n", dis.c_str());
+                    }
+#ifdef SUPPORT_FAKE_6502
+                    if(use_fake6502) {
+                        clockticks6502 = 0;
+                        step6502();
+                        clk.add_cpu_cycles(clockticks6502);
+                    } else
+#endif
+                    {
+                        cpu.cycle();
+                        if(debug & DEBUG_STATE) {
+                            print_cpu_state(cpu);
+                        }
+                    }
+#if defined(ROSA)
+                    chrono::time_point<chrono::system_clock> housekeeping_now = std::chrono::system_clock::now();
+                    auto housekeeping_micros = chrono::duration_cast<chrono::microseconds>(housekeeping_now - cpu_speed_then);
+                    if(housekeeping_micros.count() > 1000) {
+                        RoDoHousekeeping();
+                        housekeeping_prev = housekeeping_now;
+                    }
+#endif
+                    if(debug & DEBUG_CLOCK) {
+                        printf("clock = %" PRIu32 ", %" PRIu32 "\n", (uint32_t)(clk / (1LLU << 32)), (uint32_t)(clk % (1LLU << 32)));
+                    }
+                }
+                mainboard->sync();
+
+                chrono::time_point<chrono::system_clock> cpu_speed_now = std::chrono::system_clock::now();
+
+                auto cpu_elapsed_seconds = chrono::duration_cast<chrono::duration<float> >(cpu_speed_now - cpu_speed_then);
+                cpu_speed_then = cpu_speed_now;
+
+                clk_t cpu_elapsed_cycles = clk.clock_cpu - cpu_previous_cycles;
+                cpu_previous_cycles = clk.clock_cpu;
+
+                float cpu_speed = cpu_elapsed_cycles / cpu_elapsed_seconds.count();
+                cpu_speed_averaged.add(cpu_speed);
+
+                APPLE2Einterface::iterate(mode_history, clk.clock_cpu, cpu_speed_averaged.get() / 1000000.0f);
+                mode_history.clear();
+
+                chrono::time_point<chrono::system_clock> now = std::chrono::system_clock::now();
+
+                auto elapsed_millis = chrono::duration_cast<chrono::milliseconds>(now - then);
+
+                if(!run_fast || pause_cpu) {
+                    sleep_for(clocks_per_slice * 1000 / machine_clock_rate - elapsed_millis.count());
+                }
+
+                then = now;
+
+            } else {
+
+                int steps = 1;
+                printf("> ");
+                char line[512];
+                if(fgets(line, sizeof(line) - 1, stdin) == NULL) {
+                    exit(0);
+                }
+                line[strlen(line) - 1] = '\0';
+                if(strcmp(line, "go") == 0) {
+                    printf("continuing\n");
+                    debugging = false;
+                    continue;
+                } else if(strncmp(line, "step", 4) == 0) {
+                    if(line[5] != '\0') {
+                        steps = atoi(line + 5);
+                        printf("run for %d steps\n", steps);
+                    }
+                } else if(strncmp(line, "break", 5) == 0) {
+                    if(line[6] != '\0') {
+                        uint16_t addr = strtoul(line + 5, NULL, 0);
+                        printf("breakpoint at 0x%04X\n", addr);
+                        breakpoints.insert(addr);
+                    } else {
+                        printf("expected breakpoint address\n");
+                    }
+                    continue;
+                } else if(strcmp(line, "fast") == 0) {
+                    printf("run flat out\n");
+                    run_fast = true;
+                    continue;
+                } else if(strcmp(line, "slow") == 0) {
+                    printf("run 1mhz\n");
+                    run_fast = false;
+                    continue;
+                } else if(strcmp(line, "banking") == 0) {
+                    printf("abort on any banking\n");
+                    exit_on_banking = true;
+                    continue;
+                } else if(strncmp(line, "debug", 5) == 0) {
+                    sscanf(line + 6, "%" SCNu32, &debug);
+                    printf("debug set to %02" PRIu32 "\n", debug);
+                    continue;
+                } else if(strcmp(line, "reset") == 0) {
+                    printf("machine reset.\n");
+                    bus.reset();
+                    cpu.reset();
+                    continue;
+                } else if(strcmp(line, "reboot") == 0) {
+                    printf("CPU rebooted (NMI).\n");
+                    bus.reset();
+                    cpu.nmi();
+                    continue;
+                }
+                for(int i = 0; i < steps; i++) {
+                    if(debug & DEBUG_DECODE) {
+                        string dis = read_bus_and_disassemble(bus,
+#ifdef SUPPORT_FAKE_6502
+                                use_fake6502 ? pc :
+#endif
+                                cpu.pc);
+                        printf("%s\n", dis.c_str());
+                    }
+
+#ifdef SUPPORT_FAKE_6502
+                    if(use_fake6502) {
+                        clockticks6502 = 0;
+                        step6502();
+                        clk.add_cpu_cycles(clockticks6502);
+                    } else
+#endif
+                    {
+                        cpu.cycle();
+                        if(debug & DEBUG_STATE)
+                            print_cpu_state(cpu);
+                    }
+                    if((i % 10000) == 0) {
+                        mainboard->sync();
+                    }
+                    if((i % 100000) == 0) {
+                        APPLE2Einterface::iterate(mode_history, clk.clock_cpu, 1.023);
+                        mode_history.clear();
+                    }
+
+                    uint16_t pcnow = 
+#ifdef SUPPORT_FAKE_6502
+                        use_fake6502 ? pc :
+#endif
+                        cpu.pc;
+                    printf("%04X, %zd\n", pcnow, breakpoints.count(pcnow));
+                    if(breakpoints.count(pcnow) > 0) {
+                        printf("break at 0x%4X\n", pcnow);
+                        break;
+                    }
+                }
+            }
         }
+
+    } catch (std::bad_alloc& ba) {
+
+        // printf("bad_alloc at %d in %s\n", __LINE__, __FILE__);
+        std::cerr << "bad_alloc caught: " << ba.what() << '\n';
     }
 
     APPLE2Einterface::shutdown();
