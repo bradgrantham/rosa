@@ -1468,10 +1468,13 @@ struct MAINboard : board_base
 
     typedef std::function<bool (int addr, bool aux, uint8_t data)> display_write_func;
     display_write_func display_write;
+
     typedef std::function<void (uint8_t *buffer, size_t bufferSize)> audio_flush_func;
     audio_flush_func audio_flush;
+
     typedef std::function<tuple<float, bool> (int num)> get_paddle_func;
     get_paddle_func get_paddle;
+
     clk_t paddles_clock_out[4];
     MAINboard(system_clock& clk_, const uint8_t rom_image[32768], display_write_func display_write_, int audio_sample_rate, size_t actual_audio_buffer_size, audio_flush_func audio_flush_, get_paddle_func get_paddle_) :
         clk(clk_),
@@ -2499,7 +2502,7 @@ int apple2_main(int argc, const char **argv)
                     }
 #if defined(ROSA)
                     chrono::time_point<chrono::system_clock> housekeeping_now = std::chrono::system_clock::now();
-                    auto housekeeping_micros = chrono::duration_cast<chrono::microseconds>(housekeeping_now - cpu_speed_then);
+                    auto housekeeping_micros = chrono::duration_cast<chrono::microseconds>(housekeeping_now - housekeeping_prev);
                     if(housekeeping_micros.count() > 1000) {
                         RoDoHousekeeping();
                         housekeeping_prev = housekeeping_now;
@@ -2527,9 +2530,10 @@ int apple2_main(int argc, const char **argv)
 
                 chrono::time_point<chrono::system_clock> now = std::chrono::system_clock::now();
 
-                auto elapsed_millis = chrono::duration_cast<chrono::milliseconds>(now - then);
-
                 if(!run_fast || pause_cpu) {
+
+                    auto elapsed_millis = chrono::duration_cast<chrono::milliseconds>(now - then);
+
                     sleep_for(clocks_per_slice * 1000 / machine_clock_rate - elapsed_millis.count());
                 }
 
@@ -2638,6 +2642,7 @@ int apple2_main(int argc, const char **argv)
         // printf("bad_alloc at %d in %s\n", __LINE__, __FILE__);
         std::cerr << "bad_alloc caught: " << ba.what() << '\n';
     }
+
 
     APPLE2Einterface::shutdown();
     return 0;
