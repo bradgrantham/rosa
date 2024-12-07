@@ -258,6 +258,7 @@ static void WozMemoryByteToFontIndex(int byte, int *fontIndex, int *inverse)
 
 
 uint8_t TextBuffer[0x400];
+uint8_t HGRBuffer[0x2000];
 
 static void FillRowBuffer40Text([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
@@ -282,9 +283,88 @@ static void FillRowBuffer40Text([[maybe_unused]] int frameIndex, int rowNumber, 
     }
 }
 
+void FillRowBufferGR([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
+{
+    int rowIndex = rowNumber - WOZ_MODE_TOP;
+    if((rowIndex >= 0) && (rowIndex < 192)) {
+
+        memset(rowBuffer + WOZ_MODE_LEFT, NTSCBlack, WOZ_MODE_WIDTH);
+
+        int rowInText = rowIndex / 8;
+        int rowInGlyph = rowIndex % 8;
+
+        const uint8_t *rowSrc = TextBuffer + rowInText * 40;
+
+        uint8_t *rowDst = rowBuffer + WOZ_MODE_LEFT;
+
+        for(int column = 0; column < 560;) {
+            uint8_t byte = rowSrc[column / 14];
+            uint8_t nybble = ((rowInGlyph < 4) ? (byte) : (byte >> 4)) & 0xF;
+
+            for(int i = 0; i < 14; i++, column++) {
+                int bitInNybble = column % 4;
+                int bit = nybble & (1 << bitInNybble);
+                *rowDst++ = bit ? NTSCWhite : NTSCBlack;
+            }
+        }
+    }
+}
+
+__attribute__((hot,flatten)) void FillRowBufferHGR([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
+{
+    int rowIndex = rowNumber - WOZ_MODE_TOP;
+    uint8_t darker = NTSCBlack + (NTSCWhite - NTSCBlack) / 4; // XXX debug
+    if((rowIndex >= 0) && (rowIndex < 192)) {
+        const uint8_t *rowSrc = HGRBuffer + rowIndex * 40; // row - ...?
+
+        for(int byteIndex = 0; byteIndex < 40; byteIndex++) {
+
+            uint8_t byte = *rowSrc++;
+
+            uint8_t colorShift = byte >> 7;
+            uint8_t *rowDst = rowBuffer + WOZ_MODE_LEFT + byteIndex * 14 + colorShift;
+
+            for(int bitIndex = 0; bitIndex < 7; bitIndex++) {
+                if(byte & 0x1) {
+                    if(0) {
+                        // XXX debug
+                        *rowDst++ = darker;
+                        *rowDst++ = darker;
+                    } else {
+                        *rowDst++ = NTSCWhite;
+                        *rowDst++ = NTSCWhite;
+                    }
+                } else {
+                    if(0) {
+                        *rowDst++ = NTSCBlack;
+                        *rowDst++ = NTSCBlack;
+                    } else {
+                        rowDst += 2;
+                    }
+                }
+                byte = byte >> 1;
+            }
+        }
+    }
+}
+
+
+enum DisplayMode {TEXT, GR, HGR} display_mode = TEXT;
+
 static void FillRowBuffer(int frameIndex, [[maybe_unused]] int lineWithinField, int rowNumber, size_t maxSamples, uint8_t* rowBuffer)
 {
-    FillRowBuffer40Text(frameIndex, rowNumber, maxSamples, rowBuffer);
+    if(display_mode == TEXT)
+    {
+        FillRowBuffer40Text(frameIndex, rowNumber, maxSamples, rowBuffer);
+    }
+    else if(display_mode == GR)
+    {
+        FillRowBufferGR(frameIndex, rowNumber, maxSamples, rowBuffer);
+    }
+    else
+    {
+        FillRowBufferHGR(frameIndex, rowNumber, maxSamples, rowBuffer);
+    }
 }
 
 static int ModeInit([[maybe_unused]] void *private_data, uint8_t black, uint8_t white)
@@ -361,19 +441,86 @@ std::tuple<uint16_t, uint16_t> wozAddressToTextBufferAddress(uint16_t wozAddress
     return std::make_tuple(row, bufferAddress);
 }
 
+std::tuple<uint16_t, uint16_t> wozAddressToHGRBufferAddress(uint16_t wozAddress)
+{
+    uint16_t part1 = (wozAddress & 0x1C00) >>  10;
+    uint16_t part2 = (wozAddress & 0x0380) >>   7;
+    uint16_t part3 = (wozAddress & 0x007F) / 0x28;
+    uint16_t byte = (wozAddress & 0x007F) % 0x28;
+
+    uint16_t row = part3 * 64 + part2 * 8 + part1;
+    uint16_t bufferAddress = row * 40 + byte;
+
+    return std::make_tuple(row, bufferAddress);
+}
+
+
 std::deque<uint8_t> keyboard_buffer;
+
+struct SoftSwitch
+{
+    std::string name;
+    int clear_address;
+    int set_address;
+    int read_address;
+    bool read_also_changes;
+    bool enabled;
+    bool implemented;
+    SoftSwitch(const char* name_, int clear, int on, int read, bool read_changes, std::vector<SoftSwitch*>& s, bool initialValue, bool implemented_ = false) :
+        name(name_),
+        clear_address(clear),
+        set_address(on),
+        read_address(read),
+        read_also_changes(read_changes),
+        enabled(initialValue),
+        implemented(implemented_)
+    {
+        s.push_back(this);
+    }
+    operator bool() const
+    {
+        return enabled;
+    }
+};
 
 struct bus
 {
     std::array<uint8_t, 32 * 1024> ROM;
     std::array<uint8_t, 64 * 1024> RAM;
-    bool textport_changed;
 
-    bus(const uint8_t* ROM_) :
-        textport_changed(false)
+    std::vector<SoftSwitch*> switches;
+    std::array<SoftSwitch*, 256> switches_by_address;
+    // Inside the Apple //e, page 379
+    SoftSwitch SLOTCXROM {"SLOTCXROM", 0xC007, 0xC006, 0xC015, false, switches, false, true};
+    SoftSwitch STORE80 {"STORE80", 0xC000, 0xC001, 0xC018, false, switches, false, true};
+    SoftSwitch RAMRD {"RAMRD", 0xC002, 0xC003, 0xC013, false, switches, false, true};
+    SoftSwitch RAMWRT {"RAMWRT", 0xC004, 0xC005, 0xC014, false, switches, false, true};
+    SoftSwitch ALTZP {"ALTZP", 0xC008, 0xC009, 0xC016, false, switches, false, true};
+    SoftSwitch C3ROM {"C3ROM", 0xC00A, 0xC00B, 0xC017, false, switches, false, true};
+    SoftSwitch ALTCHAR {"ALTCHAR", 0xC00E, 0xC00F, 0xC01E, false, switches, false, true};
+    SoftSwitch VID80 {"VID80", 0xC00C, 0xC00D, 0xC01F, false, switches, false, true};
+    SoftSwitch TEXT {"TEXT", 0xC050, 0xC051, 0xC01A, true, switches, false, true};
+    SoftSwitch MIXED {"MIXED", 0xC052, 0xC053, 0xC01B, true, switches, false, true};
+    SoftSwitch PAGE2 {"PAGE2", 0xC054, 0xC055, 0xC01C, true, switches, false, true};
+    SoftSwitch HIRES {"HIRES", 0xC056, 0xC057, 0xC01D, true, switches, false, true};
+
+    void process_switches(void) const
+    {
+        display_mode = TEXT ? DisplayMode::TEXT : (HIRES ? DisplayMode::HGR : DisplayMode::GR);
+    }
+
+    bus(const uint8_t* ROM_)
     {
         std::copy(ROM_, ROM_ + 32 * 1024, ROM.begin());
         std::fill(RAM.begin(), RAM.end(), 0xA5);
+
+        switches_by_address.fill(nullptr);
+
+        for(auto sw : switches) {
+            switches_by_address[sw->clear_address - 0xC000] = sw;
+            switches_by_address[sw->set_address - 0xC000] = sw;
+            switches_by_address[sw->read_address - 0xC000] = sw;
+        }
     }
 
     uint8_t read(uint16_t addr) const
@@ -381,6 +528,10 @@ struct bus
         if(addr < 0xC000)
         {
             return RAM[addr];
+        }
+        else if(addr >= 0xC100)
+        {
+            return ROM[addr - 0x8000];
         }
         else if(addr == 0xC000)
         {
@@ -399,7 +550,29 @@ struct bus
             }
             return 0x0;
         }
-        return ROM[addr - 0x8000];
+        else if(addr > 0xC000 && addr < 0xC0FF)
+        {
+            if(auto sw = switches_by_address[addr - 0xC000])
+            {
+                uint8_t data = 0xFF;
+                if(sw->read_also_changes && addr == sw->set_address)
+                {
+                    sw->enabled = true;
+                }
+                else if(sw->read_also_changes && addr == sw->clear_address)
+                {
+                    sw->enabled = false;
+                }
+                else if(addr == sw->read_address)
+                {
+                    data = sw->enabled ? 0x80 : 0x00;
+                }
+                process_switches();
+                return data;
+            }
+            return 0x0;
+        }
+        return 0x0;
     }
 
     void write(uint16_t addr, uint8_t data)
@@ -409,11 +582,17 @@ struct bus
             RAM[addr] = data;
             if(addr >= 0x400 && addr < 0x800)
             {
-                textport_changed = true;
                 size_t wozAddress = addr - 0x400;
                 uint16_t within_page;
                 std::tie(std::ignore, within_page) = wozAddressToTextBufferAddress(wozAddress);
                 TextBuffer[within_page] = data;
+            }
+            else if(addr >= 0x2000 && addr < 0x4000)
+            {
+                size_t wozAddress = addr - 0x2000;
+                uint16_t within_page;
+                std::tie(std::ignore, within_page) = wozAddressToHGRBufferAddress(wozAddress);
+                HGRBuffer[within_page] = data;
             }
         }
         else if(addr == 0xC010)
@@ -422,6 +601,21 @@ struct bus
             if(!keyboard_buffer.empty())
             {
                 keyboard_buffer.pop_front();
+            }
+        }
+        else if(addr > 0xC000 && addr < 0xC0FF)
+        {
+            if(auto sw = switches_by_address[addr - 0xC000])
+            {
+                if(addr == sw->set_address)
+                {
+                    sw->enabled = true;
+                }
+                else if(addr == sw->clear_address)
+                {
+                    sw->enabled = false;
+                }
+                process_switches();
             }
         }
     }
@@ -597,9 +791,17 @@ static void ProcessKey(int press, int key)
                 } else {
                     event_queue.push_back({RESET, 0});
                 }
-
-            } else {
-
+            }
+            else if(super_down && key == KEYCAP_V)
+            {
+                char* text = RoGetClipboardString();
+                if (text)
+                {
+                    event_queue.push_back({PASTE, 0, text});
+                }
+            }
+            else
+            {
                 if(HIDkeyToInterfaceKey.count(key) > 0) {
                     event_queue.push_back({KEYDOWN, HIDkeyToInterfaceKey.at(key)});
                 }
@@ -742,7 +944,19 @@ static void process_events()
 
     while(event_waiting()) {
         event e = dequeue_event();
-        if(e.type == KEYDOWN) {
+        if(e.type == PASTE)
+        {
+            for(size_t i = 0; i < strlen(e.str); i++)
+            {
+                if(e.str[i] == '\n')
+                    enqueue_key('\r');
+                else
+                    enqueue_key(e.str[i]);
+            }
+            free(e.str);
+        }
+        else if(e.type == KEYDOWN)
+        {
             if((e.value == LEFT_SHIFT) || (e.value == RIGHT_SHIFT))
                 shift_down = true;
             else if((e.value == LEFT_CONTROL) || (e.value == RIGHT_CONTROL))
