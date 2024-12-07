@@ -446,7 +446,6 @@ void DecodeColorToRGB(const uint8_t *samples, uint8_t *rgb)
     Averager<float, MULTIPLE> y_averaged(0);
     Averager<float, MULTIPLE> i_averaged(0);
     Averager<float, MULTIPLE> q_averaged(0);
-    [[maybe_unused]] float chrominance;
     [[maybe_unused]] float y;
     float i, q;
 
@@ -474,8 +473,6 @@ void DecodeColorToRGB(const uint8_t *samples, uint8_t *rgb)
         y_averaged.update(y);
         i_averaged.update(i); // XXX This should perform a rotation and manage crossing 0, could interpolate poorly
         q_averaged.update(q); // XXX This should perform a rotation and manage crossing 0, could interpolate poorly
-
-        chrominance = atan2f(q, i) + M_PI; // 0..Math.PI*2
 
         float r, g, b;
         RoYIQToRGB(y_averaged, i_averaged, q_averaged, &r, &g, &b);
@@ -864,6 +861,19 @@ void Frame(unsigned char *samples)
     if(0) printf("SDL texture upload took %.2fms\n", elapsed / 1000.0f);
 }
 
+char *RoGetClipboardString()
+{
+    // size_t size;
+    // char *SDL_clip = SDL_GetClipboardData("text/plain", &size);
+    char *SDL_clip = SDL_GetClipboardText();
+    if(SDL_clip == NULL)
+    {
+        return NULL;
+    }
+    char *my_clip = strdup(SDL_clip);
+    SDL_free(SDL_clip);
+    return my_clip;
+}
 
 /*
 # moving to NTSC kit
@@ -900,12 +910,16 @@ int RoDoHousekeeping(void)
 
     now = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_frame_processing).count();
-    if(elapsed > 15) {
+    if(elapsed > 30) {
         last_frame_processing = now;
+        auto before = std::chrono::system_clock::now();
         if(samplesAreAValidFrame)
         {
             Frame(samples);
         }
+        auto after = std::chrono::system_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(after - before).count();
+        if(0) printf("making a frame took %.2fms\n", elapsed / 1000.0f);
     }
 
     return 0;

@@ -152,6 +152,8 @@ void RoKeyRepeatRelease(RoKeyRepeatManager *mgr, int released);
 void RoKeyRepeatPress(RoKeyRepeatManager *mgr, int pressed);
 int RoKeyRepeatUpdate(RoKeyRepeatManager *mgr, int haveEvent, RoEvent* ev);
 
+char *RoGetClipboardString();
+
 #ifdef __cplusplus
 };
 #endif /* __cplusplus */
