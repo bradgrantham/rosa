@@ -3,7 +3,6 @@
 #include <cstdlib>
 #include <cassert>
 #include <thread>
-#include <deque>
 #include <chrono>
 #include <array>
 #include <dirent.h>
@@ -859,6 +858,11 @@ void Frame(unsigned char *samples)
     after = std::chrono::system_clock::now();
     elapsed = std::chrono::duration_cast<std::chrono::microseconds>(after - before).count();
     if(0) printf("SDL texture upload took %.2fms\n", elapsed / 1000.0f);
+}
+
+void RoSetClipboardString(char *str)
+{
+    SDL_SetClipboardText(str);
 }
 
 char *RoGetClipboardString()
