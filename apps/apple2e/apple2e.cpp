@@ -95,7 +95,7 @@ volatile uint32_t debug = DEBUG_ERROR | DEBUG_WARN;
 bool delete_is_left_arrow = true;
 volatile bool exit_on_banking = false;
 volatile bool exit_on_memory_fallthrough = true;
-volatile bool run_fast = false;
+volatile bool run_fast = true;
 volatile bool pause_cpu = false;
 
 bool run_rate_limited = false;
@@ -986,7 +986,8 @@ struct DISKIIboard : board_base
 
     virtual bool read(int addr, uint8_t &data)
     {
-        if(rom_C600.read(addr, data)) {
+        if(rom_C600.contains(addr)) {
+            data = rom_C600.memory[addr - 0xC600];
             if(debug & DEBUG_RW) printf("DiskII read 0x%04X -> %02X\n", addr, data);
             return true;
         }
@@ -1536,17 +1537,22 @@ struct MAINboard : board_base
     bool read(int addr, uint8_t &data)
     {
         if(debug & DEBUG_RW) printf("MAIN board read\n");
+
+	// The reason this has to be first is that otherwise either
+	// rom_CXXX_default or rom_C400 will serve the read.
         for(auto b : boards) {
             if(b->read(addr, data)) {
                 return true;
             }
         }
+
         auto* r = read_regions_by_page[addr / 256];
         if(r) {
             data = r->memory[addr - r->base];
             if(debug & DEBUG_RW) printf("read %02X from 0x%04X in %s\n", addr, data, r->name.c_str());
                 return true;
         }
+
         if(io_region.contains(addr)) {
             if(exit_on_banking && (banking_read_switches.find(addr) != banking_read_switches.end())) {
                 printf("bank switch control %04X, aborting\n", addr);
@@ -1830,17 +1836,14 @@ struct MAINboard : board_base
             return true;
         }
 #endif
-        if((addr >= 0x400) && (addr <= 0xBFF)) {
-            display_write(addr, write_to_aux_text1(), data);
-        }
-        if((addr >= 0x2000) && (addr <= 0x5FFF)) {
-            display_write(addr, write_to_aux_hires1(), data);
-        }
+	// The reason this has to be first is that otherwise either
+	// rom_CXXX_default or rom_C400 will serve the read.
         for(auto b : boards) { 
             if(b->write(addr, data)) {
                 return true;
             }
         }
+
         auto* r = write_regions_by_page[addr / 256];
         if(r) {
             if(debug & DEBUG_RW) printf("wrote %02X to 0x%04X in %s\n", addr, data, r->name.c_str());
@@ -1848,8 +1851,18 @@ struct MAINboard : board_base
                 printf("write to %d outside region \"%s\", base %d, size %d\n", addr, r->name.c_str(), r->base, r->size);
             }
             r->memory[addr - r->base] = data;
+
+            if(((addr >= 0x400) && (addr <= 0xBFF)) || ((addr >= 0x2000) && (addr <= 0x5FFF)))
+            {
+                // display_write(addr, write_to_aux_text1(), data);
+                // APPLE2Einterface::write(addr, write_to_aux_text1(), data);
+                bool aux_text1 = (!STORE80 && RAMWRT) || (STORE80 && !HIRES && PAGE2);
+                APPLE2Einterface::write(addr, aux_text1, data);
+            }
+
             return true;
         }
+
         if(io_region.contains(addr)) {
             if(exit_on_banking && (banking_write_switches.find(addr) != banking_write_switches.end())) {
                 printf("bank switch control %04X, exiting\n", addr);
@@ -2428,8 +2441,8 @@ int apple2_main(int argc, const char **argv)
                     printf("failed to new DISKIIboard\n");
                 }
                 mainboard->boards.push_back(diskIIboard);
-                mockingboard = new Mockingboard();
-                mainboard->boards.push_back(mockingboard);
+                // mockingboard = new Mockingboard();
+                // mainboard->boards.push_back(mockingboard);
             } catch(const char *msg) {
                 cerr << msg << endl;
                 return 1;
@@ -2455,6 +2468,9 @@ int apple2_main(int argc, const char **argv)
 
         std::set<uint16_t> breakpoints;
 
+#if defined(ROSA)
+        int32_t housekeeping_prev = RoGetMillis();
+#endif
         while(1) {
             if(!debugging) {
 
@@ -2477,7 +2493,6 @@ int apple2_main(int argc, const char **argv)
                     }
                 }
                 clk_t prev_clock = clk;
-                chrono::time_point<chrono::system_clock> housekeeping_prev = std::chrono::system_clock::now();
                 while(clk - prev_clock < clocks_per_slice) {
                     if(debug & DEBUG_DECODE) {
                         string dis = read_bus_and_disassemble(bus,
@@ -2488,11 +2503,13 @@ int apple2_main(int argc, const char **argv)
                         printf("%s\n", dis.c_str());
                     }
 #ifdef SUPPORT_FAKE_6502
-                    if(use_fake6502) {
+                    if(use_fake6502)
+                    {
                         clockticks6502 = 0;
                         step6502();
                         clk.add_cpu_cycles(clockticks6502);
-                    } else
+                    }
+                    else
 #endif
                     {
                         cpu.cycle();
@@ -2500,18 +2517,18 @@ int apple2_main(int argc, const char **argv)
                             print_cpu_state(cpu);
                         }
                     }
-#if defined(ROSA)
-                    chrono::time_point<chrono::system_clock> housekeeping_now = std::chrono::system_clock::now();
-                    auto housekeeping_micros = chrono::duration_cast<chrono::microseconds>(housekeeping_now - housekeeping_prev);
-                    if(housekeeping_micros.count() > 1000) {
-                        RoDoHousekeeping();
-                        housekeeping_prev = housekeeping_now;
-                    }
-#endif
                     if(debug & DEBUG_CLOCK) {
                         printf("clock = %" PRIu32 ", %" PRIu32 "\n", (uint32_t)(clk / (1LLU << 32)), (uint32_t)(clk % (1LLU << 32)));
                     }
                 }
+#if defined(ROSA)
+                int32_t housekeeping_now = RoGetMillis();
+                if(housekeeping_now - housekeeping_prev > 10) {
+                    RoDoHousekeeping();
+                    housekeeping_prev = housekeeping_now;
+                }
+#endif
+
                 mainboard->sync();
 
                 chrono::time_point<chrono::system_clock> cpu_speed_now = std::chrono::system_clock::now();
@@ -2524,6 +2541,13 @@ int apple2_main(int argc, const char **argv)
 
                 float cpu_speed = cpu_elapsed_cycles / cpu_elapsed_seconds.count();
                 cpu_speed_averaged.add(cpu_speed);
+
+                static time_t prev_time = 0;
+                time_t now_time = time(0);
+                if(now_time != prev_time) {
+                    printf("averaged MHz %f\n", cpu_speed_averaged.get() / 1000000.0f);
+                    prev_time = now_time;
+                }
 
                 APPLE2Einterface::iterate(mode_history, clk.clock_cpu, cpu_speed_averaged.get() / 1000000.0f);
                 mode_history.clear();
