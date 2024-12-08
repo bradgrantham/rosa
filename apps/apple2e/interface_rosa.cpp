@@ -526,12 +526,14 @@ event dequeue_event()
         return {NONE, 0};
 }
 
+float paddle_values[4] = {0, 0, 0, 0};
+bool paddle_buttons[4] = {false, false, false, false};
+
 tuple<float,bool> get_paddle(int num)
 {
-    if(num < 0 || num > 3) {
+    if(num < 0 || num > 3)
         return make_tuple(-1, false);
-    }
-    return make_tuple(0, false);
+    return make_tuple(paddle_values[num], paddle_buttons[num]);
 }
 
 static int WozModeInit([[maybe_unused]] void *private_data, uint8_t black, uint8_t white)
