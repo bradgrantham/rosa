@@ -1554,7 +1554,7 @@ struct MAINboard : board_base
         }
     }
 
-:    bool __not_in_flash_func(read)(int addr, uint8_t &data)
+    bool __not_in_flash_func(read)(int addr, uint8_t &data)
     {
         if(debug & DEBUG_RW) printf("MAIN board read\n");
 
