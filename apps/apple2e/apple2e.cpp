@@ -719,8 +719,23 @@ int calculateMotorSnapLocation(int headLocation /* 0 to headDiscretePositions - 
 
 };
 
+struct expansion_card : board_base
+{
+    int slot;
+    uint16_t io_base;
+    uint16_t prom_base;
+    bool rom_enabled; // Set by derived class
+    expansion_card(uint16_t slot_) :
+        slot(slot_)
+    {
+        io_base = 0xC080 + slot * 0x10;
+        prom_base = 0xC000 + slot * 0x100;
+        rom_enabled = false;
+    }
+};
+
 // XXX readonly at this time
-struct DISKIIboard : board_base
+struct DISKIIboard : expansion_card
 {
     static constexpr int CA0 = 0xC0E0; // stepper phase 0 / control line 0
     static constexpr int CA1 = 0xC0E2; // stepper phase 1 / control line 1
@@ -813,6 +828,7 @@ struct DISKIIboard : board_base
     floppy_activity_func floppy_activity;
 
     DISKIIboard(const uint8_t diskII_rom[256], const char *floppy0_name, const char *floppy1_name, floppy_activity_func floppy_activity_) :
+        expansion_card(6),
         floppy_activity(floppy_activity_)
     {
         std::copy(diskII_rom, diskII_rom + 0x100, rom_C600.memory.begin());
@@ -1068,9 +1084,10 @@ struct DISKIIboard : board_base
     }
 };
 
-struct Mockingboard : board_base
+struct Mockingboard : expansion_card
 {
-    Mockingboard()
+    Mockingboard() :
+        expansion_card(4)
     {
     }
 
@@ -1220,7 +1237,7 @@ struct MAINboard : board_base
 {
     system_clock& clk;
 
-    vector<board_base*> boards;
+    vector<expansion_card*> boards;
 
     vector<SoftSwitch*> switches;
     SoftSwitch* switches_by_address[256];
@@ -1404,6 +1421,8 @@ struct MAINboard : board_base
     int disassemble_addr = 0;
 #endif
 
+    bool audio_enabled = true;
+
     void fill_flush_audio()
     {
         uint64_t current_sample = clk * actual_sample_rate / machine_clock_rate;
@@ -1417,7 +1436,10 @@ struct MAINboard : board_base
             audio_buffer[i % actual_audio_buffer_size] = speaker_level;
 
             if(i - audio_buffer_start_sample == actual_audio_buffer_size - 1) {
-                audio_flush(audio_buffer, actual_audio_buffer_size);
+                if(audio_enabled)
+                {
+                    APPLE2Einterface::enqueue_audio_samples(audio_buffer, actual_audio_buffer_size);
+                }
 
                 audio_buffer_start_sample = i + 1;
             }
@@ -1467,25 +1489,14 @@ struct MAINboard : board_base
         }
     }
 
-    typedef std::function<bool (int addr, bool aux, uint8_t data)> display_write_func;
-    display_write_func display_write;
-
-    typedef std::function<void (uint8_t *buffer, size_t bufferSize)> audio_flush_func;
-    audio_flush_func audio_flush;
-
-    typedef std::function<tuple<float, bool> (int num)> get_paddle_func;
-    get_paddle_func get_paddle;
 
     clk_t paddles_clock_out[4];
-    MAINboard(system_clock& clk_, const uint8_t rom_image[32768], display_write_func display_write_, int audio_sample_rate, size_t actual_audio_buffer_size, audio_flush_func audio_flush_, get_paddle_func get_paddle_) :
+    MAINboard(system_clock& clk_, const uint8_t rom_image[32768], int audio_sample_rate, size_t actual_audio_buffer_size) :
         clk(clk_),
         internal_C800_ROM_selected(true),
         actual_sample_rate(audio_sample_rate),
         actual_audio_buffer_size(actual_audio_buffer_size),
-        speaker_level(waveform[0]),
-        display_write(display_write_),
-        audio_flush(audio_flush_),
-        get_paddle(get_paddle_)
+        speaker_level(waveform[0])
     {
         std::copy(rom_image + rom_D000.base - 0x8000, rom_image + rom_D000.base - 0x8000 + rom_D000.size, rom_D000.memory.begin());
         std::copy(rom_image + rom_E000.base - 0x8000, rom_image + rom_E000.base - 0x8000 + rom_E000.size, rom_E000.memory.begin());
@@ -1538,11 +1549,18 @@ struct MAINboard : board_base
     {
         if(debug & DEBUG_RW) printf("MAIN board read\n");
 
+        bool in_card_rom = (addr >= 0xC800) && (addr < 0xCFFF);
+
 	// The reason this has to be first is that otherwise either
-	// rom_CXXX_default or rom_C400 will serve the read.
+	// rom_CXXX_default or rom_C400 will serve the request
         for(auto b : boards) {
-            if(b->read(addr, data)) {
-                return true;
+            bool in_io = (addr >= b->io_base) && (addr < b->io_base + 16);
+            bool in_prom =(addr >= b->prom_base) && (addr < b->prom_base + 256);
+            bool serves_card_rom = b->rom_enabled && in_card_rom;
+            if(in_io || in_prom || serves_card_rom)
+            {
+                // Only this board will answer to those addresses
+                return b->read(addr, data);
             }
         }
 
@@ -1689,7 +1707,7 @@ struct MAINboard : board_base
                 for(int i = 0; i < 4; i++) {
                     float value;
                     bool button;
-                    tie(value, button) = get_paddle(i);
+                    tie(value, button) = APPLE2Einterface::get_paddle(i);
                     paddles_clock_out[i] = clk + value * paddle_max_pulse_seconds * machine_clock_rate;
                 }
                 data = 0x0;
@@ -1706,7 +1724,7 @@ struct MAINboard : board_base
                 }
                 float value;
                 bool button;
-                tie(value, button) = get_paddle(num);
+                tie(value, button) = APPLE2Einterface::get_paddle(num);
                 data = button ? 0xff : 0x0;
                 return true;
             } else if(addr >= 0xC058 && addr <= 0xC05F) {
@@ -1836,11 +1854,18 @@ struct MAINboard : board_base
             return true;
         }
 #endif
+        bool in_card_rom = (addr >= 0xC800) && (addr < 0xCFFF);
+
 	// The reason this has to be first is that otherwise either
-	// rom_CXXX_default or rom_C400 will serve the read.
-        for(auto b : boards) { 
-            if(b->write(addr, data)) {
-                return true;
+	// rom_CXXX_default or rom_C400 will serve the request
+        for(auto b : boards) {
+            bool in_io = (addr >= b->io_base) && (addr < b->io_base + 16);
+            bool in_prom = (addr >= b->prom_base) && (addr < b->prom_base + 256);
+            bool serves_card_rom = b->rom_enabled && in_card_rom;
+            if(in_io || in_prom || serves_card_rom)
+            {
+                // Only this board will answer to those addresses
+                return b->write(addr, data);
             }
         }
 
@@ -1854,8 +1879,6 @@ struct MAINboard : board_base
 
             if(((addr >= 0x400) && (addr <= 0xBFF)) || ((addr >= 0x2000) && (addr <= 0x5FFF)))
             {
-                // display_write(addr, write_to_aux_text1(), data);
-                // APPLE2Einterface::write(addr, write_to_aux_text1(), data);
                 bool aux_text1 = (!STORE80 && RAMWRT) || (STORE80 && !HIRES && PAGE2);
                 APPLE2Einterface::write(addr, aux_text1, data);
             }
@@ -2411,14 +2434,7 @@ int apple2_main(int argc, const char **argv)
 
         MAINboard* mainboard;
 
-        MAINboard::display_write_func display = [](uint16_t addr, bool aux, uint8_t data)->bool{return APPLE2Einterface::write(addr, aux, data);};
-
-        MAINboard::get_paddle_func paddle = [](int num)->tuple<float, bool>{return APPLE2Einterface::get_paddle(num);};
-
-        (void)mute;
-        MAINboard::audio_flush_func audio = [](uint8_t *buf, size_t size){ if(!run_fast) APPLE2Einterface::enqueue_audio_samples(buf, size); };
-
-        mainboard = new MAINboard(clk, b, display, APPLE2Einterface::get_audio_sample_rate(), APPLE2Einterface::get_preferred_audio_buffer_size_samples(), audio, paddle);
+        mainboard = new MAINboard(clk, b, APPLE2Einterface::get_audio_sample_rate(), APPLE2Einterface::get_preferred_audio_buffer_size_samples());
         bus.board = mainboard;
         bus.reset();
 
@@ -2441,13 +2457,13 @@ int apple2_main(int argc, const char **argv)
                     printf("failed to new DISKIIboard\n");
                 }
                 mainboard->boards.push_back(diskIIboard);
-                // mockingboard = new Mockingboard();
-                // mainboard->boards.push_back(mockingboard);
             } catch(const char *msg) {
                 cerr << msg << endl;
                 return 1;
             }
         }
+        // mockingboard = new Mockingboard();
+        // mainboard->boards.push_back(mockingboard);
 
         CPU6502<system_clock, bus_frontend> cpu(clk, bus);
 
@@ -2472,6 +2488,8 @@ int apple2_main(int argc, const char **argv)
         int32_t housekeeping_prev = RoGetMillis();
 #endif
         while(1) {
+            mainboard->audio_enabled = !(run_fast || mute);
+
             if(!debugging) {
 
                 if(process_events(mainboard, bus, cpu) == APPLE2Einterface::QUIT) {
@@ -2523,7 +2541,7 @@ int apple2_main(int argc, const char **argv)
                 }
 #if defined(ROSA)
                 int32_t housekeeping_now = RoGetMillis();
-                if(housekeeping_now - housekeeping_prev > 10) {
+                if(housekeeping_now - housekeeping_prev > 20) {
                     RoDoHousekeeping();
                     housekeeping_prev = housekeeping_now;
                 }
@@ -2545,7 +2563,7 @@ int apple2_main(int argc, const char **argv)
                 static time_t prev_time = 0;
                 time_t now_time = time(0);
                 if(now_time != prev_time) {
-                    printf("averaged MHz %f\n", cpu_speed_averaged.get() / 1000000.0f);
+                    printf("averaged MHz %f, %.02fx a stock Apple ][\n", cpu_speed_averaged.get() / 1000000.0f, cpu_speed_averaged.get() / 1000000.0f / 1.023f);
                     prev_time = now_time;
                 }
 
