@@ -2560,13 +2560,6 @@ int apple2_main(int argc, const char **argv)
                 float cpu_speed = cpu_elapsed_cycles / cpu_elapsed_seconds.count();
                 cpu_speed_averaged.add(cpu_speed);
 
-                static time_t prev_time = 0;
-                time_t now_time = time(0);
-                if(now_time != prev_time) {
-                    printf("averaged MHz %f, %.02fx a stock Apple ][\n", cpu_speed_averaged.get() / 1000000.0f, cpu_speed_averaged.get() / 1000000.0f / 1.023f);
-                    prev_time = now_time;
-                }
-
                 APPLE2Einterface::iterate(mode_history, clk.clock_cpu, cpu_speed_averaged.get() / 1000000.0f);
                 mode_history.clear();
 
