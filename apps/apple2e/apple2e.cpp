@@ -18,6 +18,12 @@
 #include <signal.h>
 #include <unistd.h>
 
+#ifdef ROSA_PICO
+#include "pico/stdlib.h" // hmf
+#else // !ROSA_PICO
+#define __not_in_flash_func(a) a
+#endif
+
 #ifndef M_PI
 #define M_PI 3.14159
 #endif
@@ -1484,7 +1490,10 @@ struct MAINboard : board_base
     {
         APPLE2Einterface::ModeSettings settings = convert_switches_to_mode_settings();
         if(settings != old_mode_settings) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpsabi"
             mode_history.push_back(make_tuple(clk.clock_cpu, settings));
+#pragma GCC diagnostic pop
             old_mode_settings = settings;
         }
     }
@@ -1545,7 +1554,7 @@ struct MAINboard : board_base
         }
     }
 
-    bool read(int addr, uint8_t &data)
+:    bool __not_in_flash_func(read)(int addr, uint8_t &data)
     {
         if(debug & DEBUG_RW) printf("MAIN board read\n");
 
@@ -1776,7 +1785,7 @@ struct MAINboard : board_base
         }
         return false;
     }
-    bool write(int addr, uint8_t data)
+    bool __not_in_flash_func(write)(int addr, uint8_t data)
     {
 #if LK_HACK
         if(addr == 0xBFFE) {
@@ -1858,7 +1867,7 @@ struct MAINboard : board_base
 
 	// The reason this has to be first is that otherwise either
 	// rom_CXXX_default or rom_C400 will serve the request
-        for(auto b : boards) {
+        for(auto b : boards) { 
             bool in_io = (addr >= b->io_base) && (addr < b->io_base + 16);
             bool in_prom = (addr >= b->prom_base) && (addr < b->prom_base + 256);
             bool serves_card_rom = b->rom_enabled && in_card_rom;

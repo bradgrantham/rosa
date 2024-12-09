@@ -29,6 +29,13 @@
 #include <assert.h>
 #include <vector>
 
+#ifdef ROSA_PICO
+#include "pico/stdlib.h" // hmf
+#else // !ROSA_PICO
+#define __not_in_flash_func(a) a
+#endif
+
+
 #ifndef EMULATE_65C02
 
 #define EMULATE_65C02 1
@@ -420,7 +427,7 @@ struct CPU6502
         return address;
     }
 
-    void cycle()
+    void __not_in_flash_func(cycle)()
     {
         if(exception == RESET) {
             reset();
