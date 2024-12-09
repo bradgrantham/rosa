@@ -13,6 +13,12 @@
 #include <unordered_map>
 #include <unistd.h>
 
+#ifdef ROSA_PICO
+#include "pico/stdlib.h" // hmf
+#else // !ROSA_PICO
+#define __not_in_flash_func(a) a
+#endif
+
 #include "interface.h"
 
 #include "events.h"
@@ -76,7 +82,7 @@ WozModeTextBuffers_t* WozModeTextBuffers;
 static uint8_t NTSCBlack;
 static uint8_t NTSCWhite;
 
-__attribute__((hot,flatten)) void WozModeFillRowBufferHGR([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
+__attribute__((hot,flatten)) void __not_in_flash_func(WozModeFillRowBufferHGR)([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
     int rowIndex = rowNumber - WOZ_MODE_TOP;
     uint8_t darker = NTSCBlack + (NTSCWhite - NTSCBlack) / 4; // XXX debug
@@ -114,7 +120,7 @@ __attribute__((hot,flatten)) void WozModeFillRowBufferHGR([[maybe_unused]] int f
     }
 }
 
-__attribute__((hot,flatten)) void WozModeFillRowBufferDHGR([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
+__attribute__((hot,flatten)) void __not_in_flash_func(WozModeFillRowBufferDHGR)([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
     int rowIndex = rowNumber - WOZ_MODE_TOP;
     if((rowIndex >= 0) && (rowIndex < 192)) {
@@ -376,7 +382,7 @@ void WozMemoryByteToFontIndex(int byte, int *fontIndex, int *inverse)
         *fontIndex = 33;
 }
 
-void WozModeFillRowBuffer80Text([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
+void __not_in_flash_func(WozModeFillRowBuffer80Text)([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
     int rowIndex = rowNumber - WOZ_MODE_TOP;
     if((rowIndex >= 0) && (rowIndex < 192)) {
@@ -417,7 +423,7 @@ void WozModeFillRowBuffer80Text([[maybe_unused]] int frameIndex, int rowNumber, 
     }
 }
 
-void WozModeFillRowBuffer40Text([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
+void __not_in_flash_func(WozModeFillRowBuffer40Text)([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
     int rowIndex = rowNumber - WOZ_MODE_TOP;
     if((rowIndex >= 0) && (rowIndex < 192)) {
@@ -440,7 +446,7 @@ void WozModeFillRowBuffer40Text([[maybe_unused]] int frameIndex, int rowNumber, 
     }
 }
 
-void WozModeFillRowBufferLGR([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
+void __not_in_flash_func(WozModeFillRowBufferLGR)([[maybe_unused]] int frameIndex, int rowNumber, [[maybe_unused]] size_t maxSamples, uint8_t* rowBuffer)
 {
     int rowIndex = rowNumber - WOZ_MODE_TOP;
     if((rowIndex >= 0) && (rowIndex < 192)) {
@@ -532,7 +538,9 @@ bool paddle_buttons[4] = {false, false, false, false};
 tuple<float,bool> get_paddle(int num)
 {
     if(num < 0 || num > 3)
+    {
         return make_tuple(-1, false);
+    }
     return make_tuple(paddle_values[num], paddle_buttons[num]);
 }
 
@@ -823,6 +831,14 @@ void map_history_to_lines(const ModeHistory& history, [[maybe_unused]] unsigned 
 
 void iterate(const ModeHistory& history, unsigned long long current_byte, [[maybe_unused]] float megahertz)
 {
+    static uint32_t then = 0;
+
+    uint32_t now = RoGetMillis();
+    if(now > then + 1000)
+    {
+        printf("estimated %f MHz\n", megahertz);
+        then = now;
+    }
     apply_writes();
 
     map_history_to_lines(history, current_byte);
@@ -863,7 +879,6 @@ std::tuple<uint16_t, uint16_t> wozAddressToTextBufferAddress(uint16_t wozAddress
     return std::make_tuple(row, bufferAddress);
 }
 
-
 void write2(int addr, bool aux, uint8_t data)
 {
     // We know text page 1 and 2 are contiguous
@@ -885,40 +900,53 @@ void write2(int addr, bool aux, uint8_t data)
     }
 }
 
+static const bool immediate_write = true;
+
 void apply_writes(void)
 {
-    for(auto it : writes) {
-        int addr;
-        bool aux;
-        tie(addr, aux) = it.first;
-        write2(addr, aux, it.second); 
+    if(!immediate_write)
+    {
+        for(auto it : writes) {
+            int addr;
+            bool aux;
+            tie(addr, aux) = it.first;
+            write2(addr, aux, it.second); 
+        }
+        writes.clear();
+        collisions = 0;
     }
-    writes.clear();
-    collisions = 0;
 }
 
 bool write(uint16_t addr, bool aux, uint8_t data)
 {
-    // We know text page 1 and 2 are contiguous
-    if((addr >= text_page1_base) && (addr < text_page2_base + text_page_size)) {
-
-        if(writes.find({addr, aux}) != writes.end())
-            collisions++;
-        writes[{addr, aux}] = data;
-        if(writes.size() > 1000) {
-            apply_writes();
-        }
+    if(immediate_write)
+    {
+        write2(addr, aux, data);
         return true;
+    }
+    else
+    {
+        // We know text page 1 and 2 are contiguous
+        if((addr >= text_page1_base) && (addr < text_page2_base + text_page_size)) {
 
-    } else if(((addr >= hires_page1_base) && (addr < hires_page1_base + hires_page_size)) || ((addr >= hires_page2_base) && (addr < hires_page2_base + hires_page_size))) {
+            if(writes.find({addr, aux}) != writes.end())
+                collisions++;
+            writes[{addr, aux}] = data;
+            if(writes.size() > 1000) {
+                apply_writes();
+            }
+            return true;
 
-        if(writes.find({addr, aux}) != writes.end())
-            collisions++;
-        writes[{addr, aux}] = data;
-        if(writes.size() > 1000) {
-            apply_writes();
+        } else if(((addr >= hires_page1_base) && (addr < hires_page1_base + hires_page_size)) || ((addr >= hires_page2_base) && (addr < hires_page2_base + hires_page_size))) {
+
+            if(writes.find({addr, aux}) != writes.end())
+                collisions++;
+            writes[{addr, aux}] = data;
+            if(writes.size() > 1000) {
+                apply_writes();
+            }
+            return true;
         }
-        return true;
     }
     return false;
 }
