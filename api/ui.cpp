@@ -214,8 +214,17 @@ Status RoPromptUserToChooseFile(const char *title, const char *dirName, uint32_t
 
     Status result = RoFillFilenameList(dirName, flags, optionalFilterSuffix, 256, filenames, &filenamesCount);
     if(RO_FAILURE(result)) {
-        // XXX show some kind of failure
-        RoDisplayStringAndWaitForEnter("Filename chooser failure!");
+        switch(result) {
+            case RO_RESOURCE_NOT_FOUND:
+                RoDisplayStringAndWaitForEnter(filenames[filenamesCount - 1]);
+                break;
+            case RO_RESOURCE_EXHAUSTED:
+                RoDisplayStringAndWaitForEnter("Too many filenames");
+                break;
+            default:
+                RoDisplayStringAndWaitForEnter("Filename chooser failure");
+                break;
+        }
         return RO_RESOURCE_NOT_FOUND;
     }
     if(filenamesCount == 0) {
