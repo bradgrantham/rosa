@@ -179,7 +179,7 @@ int mp3player_main(int argc, const char **argv);
 #define main mp3player_main
 
 static int initializer = []() -> int {
-    LauncherRegisterApp("MP3 Player", "mp3player", "an MP3 file", ".", ".mp3", {}, {}, mp3player_main);
+    LauncherRegisterApp("MP3 Player", "mp3player", "Choose a Track", ".", ".mp3", {}, {}, mp3player_main);
     return 1;
 }();
 

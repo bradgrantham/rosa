@@ -1769,7 +1769,7 @@ int coleco_main(int argc, const char **argv);
 #define main coleco_main
 
 static volatile int register_app_initializer = []() -> int {
-    LauncherRegisterApp("Colecovision Emulator", "emulator", "a Coleco cartridge", "coleco", "", {"coleco/COLECO.ROM"}, {}, coleco_main);
+    LauncherRegisterApp("Colecovision Emulator", "emulator", "Choose a Coleco Cartridge", "coleco", "", {"coleco/COLECO.ROM"}, {}, coleco_main);
     return 1;
 }();
 

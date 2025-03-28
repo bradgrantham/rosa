@@ -2343,7 +2343,7 @@ int apple2_main(int argc, const char **argv);
 };
 
 static int register_app_initializer = []() -> int {
-    LauncherRegisterApp("Apple //e Emulator", "apple2e", "a disk image", "floppies", ".dsk", {"-diskII", "diskII.c600.c6ff.bin"}, {"none", "apple2e.rom"}, apple2_main);
+    LauncherRegisterApp("Apple //e Emulator", "apple2e", "Choose A Disk Image", "floppies", ".dsk", {"-diskII", "diskII.c600.c6ff.bin"}, {"none", "apple2e.rom"}, apple2_main);
     LauncherRegisterApp("Apple //e Emulator (no Disk II)", "", "", "", "", {}, {"apple2e.rom"}, apple2_main);
     return 1;
 }();
