@@ -17,14 +17,51 @@ int showimage_main(int argc, const char **argv);
 #define main showimage_main
 
 static int initializer = []() -> int {
-    LauncherRegisterApp("Image Viewer", "showimage", "an image file", "images", ".ppm", {}, {}, showimage_main);
+    LauncherRegisterApp("Image Viewer", "showimage", "Choose An Image File", "images", ".ppm", {}, {}, showimage_main);
     return 1;
 }();
 
 #endif
 
 //----------------------------------------------------------------------------
-// 4-bit 352x384 pixmap mode
+// Video mode support
+
+void HSVToRGB3f(float h, float s, float v, float *r, float *g, float *b)
+{
+    if(s < .00001) {
+        *r = v; *g = v; *b = v;
+    } else {
+        int i;
+        float p, q, t, f;
+
+        h = fmod(h, M_PI * 2);  /* wrap just in case */
+
+        i = floor(h / (M_PI / 3));
+
+        /*
+         * would have used "f = fmod(h, M_PI / 3);", but fmod seems to have
+         * a bug under Linux.
+         */
+
+        f = h / (M_PI / 3) - floor(h / (M_PI / 3));
+
+        p = v * (1 - s);
+        q = v * (1 - s * f);
+        t = v * (1 - s * (1 - f));
+        switch(i) {
+            case 0: *r = v; *g = t; *b = p; break;
+            case 1: *r = q; *g = v; *b = p; break;
+            case 2: *r = p; *g = v; *b = t; break;
+            case 3: *r = p; *g = q; *b = v; break;
+            case 4: *r = t; *g = p; *b = v; break;
+            case 5: *r = v; *g = p; *b = q; break;
+        }
+    }
+}
+
+
+//----------------------------------------------------------------------------
+// 8-bit 352x384 pixmap mode
 
 #define VIDEO_8_BIT_MODE_WIDTH_SAMPLES 704
 #define VIDEO_8_BIT_MODE_WIDTH_PIXELS (VIDEO_8_BIT_MODE_WIDTH_SAMPLES / 2)
@@ -70,40 +107,6 @@ int Video8BitModeNeedsColorburst()
 {
     return 1;
 }
-
-void HSVToRGB3f(float h, float s, float v, float *r, float *g, float *b)
-{
-    if(s < .00001) {
-        *r = v; *g = v; *b = v;
-    } else {
-        int i;
-        float p, q, t, f;
-
-        h = fmod(h, M_PI * 2);  /* wrap just in case */
-
-        i = floor(h / (M_PI / 3));
-
-        /*
-         * would have used "f = fmod(h, M_PI / 3);", but fmod seems to have
-         * a bug under Linux.
-         */
-
-        f = h / (M_PI / 3) - floor(h / (M_PI / 3));
-
-        p = v * (1 - s);
-        q = v * (1 - s * f);
-        t = v * (1 - s * (1 - f));
-        switch(i) {
-            case 0: *r = v; *g = t; *b = p; break;
-            case 1: *r = q; *g = v; *b = p; break;
-            case 2: *r = p; *g = v; *b = t; break;
-            case 3: *r = p; *g = q; *b = v; break;
-            case 4: *r = t; *g = p; *b = v; break;
-            case 5: *r = v; *g = p; *b = q; break;
-        }
-    }
-}
-
 
 static int Video8BitModeInit([[maybe_unused]] void *private_data, uint8_t black_, uint8_t white_)
 {
@@ -164,27 +167,6 @@ __attribute__((hot,flatten)) void Video8BitModeFillRowBuffer([[maybe_unused]] in
     }
 }
 
-[[maybe_unused]] const static unsigned char RGBFor4BitPalette[][3] = {
-    // From Arne's 16-color general purpose palette
-     {0, 0, 0},
-     {157, 157, 157},
-     {255, 255, 255},
-     {190, 38, 51},
-     {224, 111, 139},
-     {73, 60, 43},
-     {164, 100, 34},
-     {235, 137, 49},
-     {247, 226, 107},
-     {47, 72, 78},
-     {68, 137, 26},
-     {163, 206, 39},
-     {27, 38, 50},
-     {0, 87, 132},
-     {49, 162, 242},
-     {178, 220, 239},
-     {255, 0, 255},
-};
-
 void Set8BitVideoMode()
 {
     RoVideoSetMode(1, RO_VIDEO_ROW_SAMPLES_912, nullptr, Video8BitModeInit, Video8BitModeFini, Video8BitModeFillRowBuffer, Video8BitModeNeedsColorburst);
@@ -234,7 +216,6 @@ int FindClosestColor(const std::array<std::array<uint8_t, 3>, 256> & palette, in
     }
     return c;
 }
-
 
 extern "C" {
 
