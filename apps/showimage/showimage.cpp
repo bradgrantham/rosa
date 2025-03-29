@@ -54,7 +54,7 @@ void HSVToRGB3f(float h, float s, float v, float *r, float *g, float *b)
             case 2: *r = p; *g = v; *b = t; break;
             case 3: *r = p; *g = q; *b = v; break;
             case 4: *r = t; *g = p; *b = v; break;
-            case 5: *r = v; *g = p; *b = q; break;
+            default: case 5: *r = v; *g = p; *b = q; break;
         }
     }
 }
@@ -72,7 +72,6 @@ void HSVToRGB3f(float h, float s, float v, float *r, float *g, float *b)
 
 uint8_t *Video8BitFramebuffer;
 
-std::array<std::array<uint8_t, 3>, 256> Video8BitPalette;
 uint8_t Video8BitColorsToNTSC[256][4];
 
 static uint8_t Video8BitModeBlack;
@@ -108,6 +107,25 @@ int Video8BitModeNeedsColorburst()
     return 1;
 }
 
+void Video8BitConvertPaletteToNTSCColors(const std::array<std::array<uint8_t, 3>, 256>& palette)
+{
+    for(int i = 0; i < 256; i++)
+    {
+        Video8BitSetPaletteEntry(i, palette[i][0], palette[i][1], palette[i][2]);
+    }
+}
+
+void Video8BitMakePaletteBlack()
+{
+    for(int i = 0; i < 256; i++)
+    {
+        Video8BitColorsToNTSC[i][0] = Video8BitModeBlack;
+        Video8BitColorsToNTSC[i][1] = Video8BitModeBlack;
+        Video8BitColorsToNTSC[i][2] = Video8BitModeBlack;
+        Video8BitColorsToNTSC[i][3] = Video8BitModeBlack;
+    }
+}
+
 static int Video8BitModeInit([[maybe_unused]] void *private_data, uint8_t black_, uint8_t white_)
 {
     Video8BitModeBlack = black_;
@@ -118,21 +136,7 @@ static int Video8BitModeInit([[maybe_unused]] void *private_data, uint8_t black_
         // out of memory
         return 0;
     }
-
-    for(int i = 0; i < 256; i++)
-    {
-        // H3S2V3
-        float h = ((i >> 5) & 7) / 7.0f * M_PI * 2;
-        float s = ((i >> 3) & 3) / 3.0f;
-        float v = ((i >> 0) & 7) / 7.0f;
-        float r, g, b;
-        HSVToRGB3f(h, s, v, &r, &g, &b);
-        Video8BitSetPaletteEntry(i, r, g, b);
-        Video8BitPalette[i][0] = r * 255;
-        Video8BitPalette[i][1] = g * 255;
-        Video8BitPalette[i][2] = b * 255;
-    }
-
+    Video8BitMakePaletteBlack();
     return 1;
 }
 
@@ -190,6 +194,23 @@ void ClearScreen(int c)
     }
 }
 
+void MakeHSVPalette(std::array<std::array<uint8_t, 3>, 256>& palette)
+{
+    for(int i = 0; i < 256; i++)
+    {
+        // H3S2V3
+        float h = ((i >> 5) & 7) / 7.0f * M_PI * 2;
+        float s = ((i >> 3) & 3) / 3.0f;
+        float v = ((i >> 0) & 7) / 7.0f;
+        float r, g, b;
+        HSVToRGB3f(h, s, v, &r, &g, &b);
+        palette[i][0] = r * 255;
+        palette[i][1] = g * 255;
+        palette[i][2] = b * 255;
+    }
+}
+
+
 enum {
     MAX_SCREEN_ROW_PIXELS = 1024,
     MAX_FILE_ROW_PIXELS = 4096,
@@ -219,6 +240,8 @@ int FindClosestColor(const std::array<std::array<uint8_t, 3>, 256> & palette, in
 
 extern "C" {
 
+std::array<std::array<uint8_t, 3>, 256> palette;
+
 int main([[maybe_unused]] int argc, const char **argv)
 {
     [[maybe_unused]] const char *filename;
@@ -226,6 +249,9 @@ int main([[maybe_unused]] int argc, const char **argv)
     filename = argv[1];
 
     Set8BitVideoMode();
+
+    MakeHSVPalette(palette);
+    Video8BitConvertPaletteToNTSCColors(palette);
     ClearScreen(1);
 
     if(true)
@@ -239,7 +265,6 @@ int main([[maybe_unused]] int argc, const char **argv)
             }
         }
     }
-
 
     FILE *fp;
     fp = fopen (filename, "rb");
@@ -258,7 +283,6 @@ int main([[maybe_unused]] int argc, const char **argv)
 
     if((ppmtype != 5) && (ppmtype != 6)) {
         printf("unsupported image type %d for \"%s\"\n", ppmtype, filename);
-        // Video8BitPalette.clear();
         fclose(fp);
         exit(1);
     }
@@ -266,7 +290,6 @@ int main([[maybe_unused]] int argc, const char **argv)
     if(width > MAX_FILE_ROW_PIXELS) {
 	printf("ERROR: width %d of image in \"%s\" is too large for static row of %u pixels\n",
             width, filename, MAX_SCREEN_ROW_PIXELS);
-        // Video8BitPalette.clear();
         fclose(fp);
         exit(1);
     }
@@ -275,7 +298,6 @@ int main([[maybe_unused]] int argc, const char **argv)
     rowRGB = (unsigned char (*)[3]) malloc(sizeof(rowRGB[0]) * MAX_FILE_ROW_PIXELS);
     if(rowRGB == NULL) {
         printf("failed to allocate row for pixel data\n");
-        // Video8BitPalette.clear();
         fclose(fp);
         exit(1);
     }
@@ -286,7 +308,6 @@ int main([[maybe_unused]] int argc, const char **argv)
     if(rowError == NULL) {
         printf("failed to allocate row for error data\n");
         free(rowRGB);
-        // Video8BitPalette.clear();
         fclose(fp);
         exit(1);
     }
@@ -303,7 +324,6 @@ int main([[maybe_unused]] int argc, const char **argv)
                 if(fread(rowRGB, 3, width, fp) != (size_t)width)
                 {
                     printf("ERROR: couldn't read row %d from \"%s\"\n", srcRow, filename);
-                    // Video8BitPalette.clear();
                     free(rowError);
                     free(rowRGB);
                     exit(1);
@@ -314,7 +334,6 @@ int main([[maybe_unused]] int argc, const char **argv)
                 if(fread(rowRGB, 1, width, fp) != (size_t)width)
                 {
                     printf("ERROR: couldn't read row %d from \"%s\"\n", srcRow, filename);
-                    // Video8BitPalette.clear();
                     free(rowError);
                     free(rowRGB);
                     exit(1);
@@ -348,7 +367,7 @@ int main([[maybe_unused]] int argc, const char **argv)
             }
 
             // Find the closest color in our palette
-            int c = FindClosestColor(Video8BitPalette, correctedRGB[0], correctedRGB[1], correctedRGB[2]);
+            int c = FindClosestColor(palette, correctedRGB[0], correctedRGB[1], correctedRGB[2]);
 
             SetPixel(x, y, c);
 
@@ -356,7 +375,7 @@ int main([[maybe_unused]] int argc, const char **argv)
             // and distribute it a la Floyd-Steinberg
             int errorFixed8[3];
             for(int i = 0; i < 3; i++) {
-                errorFixed8[i] = 255 * (correctedRGB[i] - Video8BitPalette[c][i]);
+                errorFixed8[i] = 255 * (correctedRGB[i] - palette[c][i]);
             }
             for(int i = 0; i < 3; i++) {
                 errorThisRowFixed8[x + 1][i] += errorFixed8[i] * 7 / 16;
@@ -376,7 +395,6 @@ int main([[maybe_unused]] int argc, const char **argv)
     }
 
     fclose(fp);
-    // Video8BitPalette.clear();
     free(rowError);
     free(rowRGB);
 
