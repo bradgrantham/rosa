@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <string>
 #include <vector>
+#include <algorithm>
 #include "rocinante.h"
 #include "text-mode.h"
 #include "ui.h"
@@ -45,6 +46,12 @@ extern "C" {
 int launcher_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
 {
     std::vector<const char*> applications;
+
+    std::sort(Apps->begin(), Apps->end(),
+              [](const LauncherRecord &a, const LauncherRecord &b) {
+                  return RoCompareCaseInsensitive(a.name.c_str(), b.name.c_str()) < 0;
+              });
+
     for(const auto& app: (*Apps)) {
         // XXX bare pointer to char* to interface with C
         applications.push_back(app.name.c_str());

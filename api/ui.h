@@ -15,6 +15,8 @@ Status RoPromptUserToChooseFile(const char *title, const char *dirName, uint32_t
 //----------------------------------------------------------------------------
 // Convenient text display functions
 
+int RoCompareCaseInsensitive(const char* a, const char* b);
+
 void RoShowListOfItems(const char *title, const char* const* items, size_t itemsSize, int whichAtTop, int whichSelected, int can_cancel);
 
 void RoDisplayStringCentered(const char *message);

@@ -1,5 +1,7 @@
-#include <string.h>
-#include <stdio.h>
+#include <cstring>
+#include <cstdio>
+#include <cctype>
+#include <algorithm>
 
 #include "rocinante.h"
 #include "events.h"
@@ -205,6 +207,20 @@ char *_strdup(const char *src) // strdup not compiled in with C++ ...?
     return cpy;
 }
 
+int RoCompareCaseInsensitive(const char* a, const char* b)
+{
+    while (*a && *b) {
+        unsigned char c1 = static_cast<unsigned char>(std::tolower(*a));
+        unsigned char c2 = static_cast<unsigned char>(std::tolower(*b));
+        if (c1 != c2) {
+            return c1 - c2;
+        }
+        ++a;
+        ++b;
+    }
+    return static_cast<unsigned char>(*a) - static_cast<unsigned char>(*b);
+}
+
 Status RoPromptUserToChooseFile(const char *title, const char *dirName, uint32_t flags, const char *optionalFilterSuffix, char** fileChosen)
 {
     char *filenames[256];
@@ -232,6 +248,11 @@ Status RoPromptUserToChooseFile(const char *title, const char *dirName, uint32_t
         return RO_RESOURCE_NOT_FOUND;
     }
 
+    std::sort(filenames, filenames + filenamesCount,
+              [](const char* lhs, const char* rhs) {
+                  return RoCompareCaseInsensitive(lhs, rhs) < 0;
+              });
+
     int whichItemSelected;
     result = RoPromptUserToChooseFromList(title, filenames, filenamesCount, &whichItemSelected, 1);
 
@@ -247,4 +268,3 @@ Status RoPromptUserToChooseFile(const char *title, const char *dirName, uint32_t
 
     return result;
 }
-
