@@ -358,7 +358,7 @@ void NTSCSetMode(bool interlaced, NTSCLineConfig line_config, void* private_data
 
 extern int PlatformGetNTSCLineNumber();
 
-void NTSCWaitNextField()
+void NTSCWaitNextField(void)
 {
     // Could try to conservatively guess remaining time before
     // vblank and sleep to reduce memory use
@@ -372,7 +372,7 @@ void NTSCWaitNextField()
     } while(!field0_vblank && !field1_vblank);
 }
 
-int NTSCWaitNextLine()
+int NTSCWaitNextLine(void)
 {
     // Could use a platform sleep or some other sleep mechanism
     // moderated by the scanout ISR
@@ -389,7 +389,7 @@ int NTSCWaitNextLine()
     }
 }
 
-void NTSCInitialize()
+void NTSCInitialize(void)
 {
     NTSCSyncTip = PlatformVoltageToDACValue(NTSC_SYNC_TIP_VOLTAGE);
     NTSCSyncPorch = PlatformVoltageToDACValue(NTSC_SYNC_PORCH_VOLTAGE);

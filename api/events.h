@@ -152,7 +152,7 @@ void RoKeyRepeatRelease(RoKeyRepeatManager *mgr, int released);
 void RoKeyRepeatPress(RoKeyRepeatManager *mgr, int pressed);
 int RoKeyRepeatUpdate(RoKeyRepeatManager *mgr, int haveEvent, RoEvent* ev);
 
-char *RoGetClipboardString();
+char *RoGetClipboardString(void);
 void RoSetClipboardString(char *str);
 
 #ifdef __cplusplus

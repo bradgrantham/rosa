@@ -22,12 +22,12 @@ void RoVideoSetMode(bool interlaced, RoRowConfig line_config, void* private_data
     NTSCSetMode(interlaced, config, private_data, initFunc, finiFunc, fillBufferFunc, needsColorBurstFunc);
 }
 
-void RoVideoWaitNextField()
+void RoVideoWaitNextField(void)
 {
     NTSCWaitNextField();
 }
 
-int RoVideoWaitNextLine()
+int RoVideoWaitNextLine(void)
 {
     return NTSCWaitNextLine();
 }

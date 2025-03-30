@@ -9,16 +9,16 @@ extern "C" {
 
 // Defined by platform, called by NTSC-Kit
 void PlatformEnableNTSCScanout(NTSCLineConfig line_config, bool interlaced);
-void PlatformDisableNTSCScanout();
+void PlatformDisableNTSCScanout(void);
 uint8_t PlatformVoltageToDACValue(float voltage);
-int PlatformGetNTSCLineNumber();
+int PlatformGetNTSCLineNumber(void);
 
 // Defined by NTSC-KIT, called by platform, preferably immediately after
 // beginning scanout of the *other* scanline buffer
 void NTSCFillLineBuffer(int frameNumber, int lineNumber, unsigned char *lineBuffer);
 
 // Defined by NTSC-KIT, called by platform to initialize state
-void NTSCInitialize();
+void NTSCInitialize(void);
 
 #ifdef __cplusplus
 };

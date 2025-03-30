@@ -21,7 +21,7 @@ static char *TextModeBuffer;
 
 static uint8_t NTSCBlack, NTSCWhite;
 
-void RoTextModeClearDisplay()
+void RoTextModeClearDisplay(void)
 {
     memset(TextModeBuffer, ' ', TextModeWidth * TextModeHeight);
     memset(TextModeAttributes, TEXT_NO_ATTRIBUTES, TextModeWidth * TextModeHeight);
@@ -93,7 +93,7 @@ void RoTextModeGetSize(int *w, int *h)
     *h = TextModeHeight;
 }
 
-int RoTextModeNeedsColorburst()
+int RoTextModeNeedsColorburst(void)
 {
     return 0;
 }
@@ -114,7 +114,7 @@ void RoTextModeSetLine(int row, int column, uint8_t attributes, const char *stri
     memset(TextModeAttributes + row * TextModeWidth + column, attributes, toCopy);
 }
 
-void RoTextMode()
+void RoTextMode(void)
 {
     RoVideoSetMode(0, RO_VIDEO_ROW_SAMPLES_912, nullptr, RoTextModeInit, RoTextModeFini, RoTextModeFillRowBuffer, RoTextModeNeedsColorburst);
 }

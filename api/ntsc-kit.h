@@ -49,11 +49,11 @@ typedef enum
 typedef int (*NTSCModeInitFunc)(void* private_data, uint8_t blackvalue, uint8_t whitevalue);
 typedef void (*NTSCModeFiniFunc)(void* private_data);
 typedef void (*NTSCModeFillLineBufferFunc)(int frameIndex, int lineWithinField, int lineNumber, size_t maxSamples, uint8_t* lineBuffer);
-typedef int (*NTSCModeNeedsColorburstFunc)();
+typedef int (*NTSCModeNeedsColorburstFunc)(void);
 
 void NTSCSetMode(bool interlaced, NTSCLineConfig line_config, void* private_data, NTSCModeInitFunc initFunc, NTSCModeFiniFunc finiFunc, NTSCModeFillLineBufferFunc fillBufferFunc, NTSCModeNeedsColorburstFunc needsColorBurstFunc);
-void NTSCWaitNextField();
-int NTSCWaitNextLine();
+void NTSCWaitNextField(void);
+int NTSCWaitNextLine(void);
 
 #ifdef __cplusplus
 };
