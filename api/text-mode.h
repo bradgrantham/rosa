@@ -5,9 +5,9 @@
 extern "C" {
 #endif /* __cplusplus */
 
-void RoTextMode();
+void RoTextMode(void);
 
-void RoTextModeClearDisplay();
+void RoTextModeClearDisplay(void);
 
 void RoTextModeGetSize(int *w, int *h);
 

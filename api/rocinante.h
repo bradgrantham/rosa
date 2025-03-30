@@ -71,7 +71,7 @@ size_t RoAudioEnqueueSamplesBlocking(size_t writeSize /* in bytes */, uint8_t* b
 
 /*! Clear the audio stream to silence
 */
-void RoAudioClear();
+void RoAudioClear(void);
 
 
 //----------------------------------------------------------------------------
@@ -125,7 +125,7 @@ typedef enum {
 typedef int (*RoVideoModeInitFunc)(void* private_data, uint8_t blackvalue, uint8_t whitevalue);
 typedef void (*RoVideoModeFiniFunc)(void* private_data);
 typedef void (*RoVideoModeFillLineBufferFunc)(int frameIndex, int lineWithinField, int lineNumber, size_t maxSamples, uint8_t* lineBuffer);
-typedef int (*RoVideoModeNeedsColorburstFunc)();
+typedef int (*RoVideoModeNeedsColorburstFunc)(void);
 
 typedef uint32_t ntsc_wave_t;
 
@@ -194,8 +194,8 @@ inline void RoYIQToRGB(float y, float i, float q, float *r, float *g, float *b)
 }
 
 void RoVideoSetMode(bool interlaced, RoRowConfig line_config, void* private_data, RoVideoModeInitFunc initFunc, RoVideoModeFiniFunc finiFunc, RoVideoModeFillLineBufferFunc fillBufferFunc, RoVideoModeNeedsColorburstFunc needsColorBurstFunc);
-void RoVideoWaitNextField();
-int RoVideoWaitNextLine();
+void RoVideoWaitNextField(void);
+int RoVideoWaitNextLine(void);
 
 //----------------------------------------------------------------------------
 // Do periodic work that has to happen > 10 times a second
@@ -211,7 +211,7 @@ void RoPanic(void);
 // Timing convenience functions
 
 void RoDelayMillis(uint32_t millis);
-uint32_t RoGetMillis();
+uint32_t RoGetMillis(void);
 
 #ifdef __cplusplus
 };
