@@ -356,7 +356,7 @@ void NTSCSetMode(bool interlaced, NTSCLineConfig line_config, void* private_data
     PlatformEnableNTSCScanout(line_config, interlaced);
 }
 
-extern int PlatformGetNTSCLineNumber();
+extern int PlatformGetNTSCLineNumber(void);
 
 void NTSCWaitNextField(void)
 {

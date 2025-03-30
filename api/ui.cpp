@@ -102,6 +102,8 @@ Status RoPromptUserToChooseFromList(const char *title, const char* const* items,
 
         int moveUpOne = 0;
         int moveDownOne = 0;
+        int moveUpPage = 0;
+        int moveDownPage = 0;
         int selectCurrentLine = 0;
 
         if(redraw) {
