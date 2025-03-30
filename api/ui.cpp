@@ -114,12 +114,14 @@ Status RoPromptUserToChooseFromList(const char *title, const char* const* items,
         uint8_t joystick1 = RoGetJoystickState(CONTROLLER_1);
         int northPressed = joystick1 & CONTROLLER_NORTH_BIT;
         int southPressed = joystick1 & CONTROLLER_SOUTH_BIT;
+        int westPressed = joystick1 & CONTROLLER_WEST_BIT;
+        int eastPressed = joystick1 & CONTROLLER_EAST_BIT;
         int firePressed = joystick1 & CONTROLLER_FIRE_BIT;
         uint8_t keypad1 = RoGetKeypadState(CONTROLLER_1);
         int fire2Pressed = keypad1 & CONTROLLER_FIRE_BIT;
 
         // Next two are "Was there a game controller event I care about in this loop?"
-        if(northPressed || southPressed || firePressed) {
+        if(westPressed || eastPressed || northPressed || southPressed || firePressed) {
             joystick1Was = joystick1;
             debounceStart = RoGetMillis();
         }
@@ -136,6 +138,12 @@ Status RoPromptUserToChooseFromList(const char *title, const char* const* items,
             }
             if(joystick1Was & CONTROLLER_SOUTH_BIT) {
                 moveDownOne = 1;
+            }
+            if(joystick1Was & CONTROLLER_WEST_BIT) {
+                moveUpPage = 1;
+            }
+            if(joystick1Was & CONTROLLER_EAST_BIT) {
+                moveDownPage = 1;
             }
             if(joystick1Was & CONTROLLER_FIRE_BIT) {
                 selectCurrentLine = 1;
@@ -180,6 +188,14 @@ Status RoPromptUserToChooseFromList(const char *title, const char* const* items,
                         } else if(raw.key == KEYCAP_DOWN) {
 
                             moveDownOne = 1;
+
+                        } else if(raw.key == KEYCAP_PAGEUP) {
+
+                            moveUpPage = 1;
+
+                        } else if(raw.key == KEYCAP_PAGEDOWN) {
+
+                            moveDownPage = 1;
                         }
                     }
                     break;
@@ -204,11 +220,26 @@ Status RoPromptUserToChooseFromList(const char *title, const char* const* items,
             }
             redraw = 1;
 
+        } else if(moveUpPage) {
+
+            int w, h;
+            RoTextModeGetSize(&w, &h);
+            int availableLines = h - 4;
+
+            for(int i = 0; i < availableLines - 1; i++) {
+                whichItemSelected = (whichItemSelected - 1 < 0) ? 0 : (whichItemSelected - 1);
+                if(whichItemAtTop > whichItemSelected) {
+                    whichItemAtTop = whichItemSelected;
+                }
+            }
+            redraw = 1;
+
         } else if(moveDownOne) {
 
             int w, h;
             RoTextModeGetSize(&w, &h);
             int availableLines = h - 4;
+
             whichItemSelected = whichItemSelected + 1;
             if(static_cast<size_t>(whichItemSelected + 1) > itemCount - 1) {
                 whichItemSelected = itemCount - 1;
@@ -216,6 +247,24 @@ Status RoPromptUserToChooseFromList(const char *title, const char* const* items,
             if(whichItemSelected > whichItemAtTop + (availableLines - 1)) {
                 whichItemAtTop = whichItemSelected - (availableLines - 1);
             }
+            redraw = 1;
+
+        } else if(moveDownPage) {
+
+            int w, h;
+            RoTextModeGetSize(&w, &h);
+            int availableLines = h - 4;
+
+            for(int i = 0; i < availableLines - 1; i++) {
+                whichItemSelected = whichItemSelected + 1;
+                if(static_cast<size_t>(whichItemSelected + 1) > itemCount - 1) {
+                    whichItemSelected = itemCount - 1;
+                }
+                if(whichItemSelected > whichItemAtTop + (availableLines - 1)) {
+                    whichItemAtTop = whichItemSelected - (availableLines - 1);
+                }
+            }
+
             redraw = 1;
         }
 
