@@ -30,9 +30,14 @@ void RoShowListOfItems(const char *title, const char* const* items, size_t items
         }
     }
 
-    const char* prompt = can_cancel ? "ESC - Cancel, ENTER - Choose" : "ENTER - Choose";
-    int promptIndent = (w - strlen(prompt)) / 2;
-    RoTextModeSetLine(h - 1, promptIndent, TEXT_NO_ATTRIBUTES, prompt);
+    if(false) {
+        const char* prompt = can_cancel ? "ENTER/FIRE1 to Choose or ESC/FIRE2" : "ENTER/FIRE1 to Choose";
+        int promptIndent = (w - strlen(prompt)) / 2;
+        if(promptIndent <= 0) {
+            printf("oops, promptIndent == %d\n", promptIndent);
+        }
+        RoTextModeSetLine(h - 1, promptIndent, TEXT_NO_ATTRIBUTES, prompt);
+    }
 }
 
 void RoDisplayStringCentered(const char *message)
@@ -89,7 +94,8 @@ Status RoPromptUserToChooseFromList(const char *title, const char* const* items,
 
     RoKeyRepeatManager keyRepeat;
     RoKeyRepeatInit(&keyRepeat);
-    uint8_t wasPressed = 0;
+    uint8_t joystick1Was = 0;
+    uint8_t keypad1Was = 0;
     uint32_t debounceStart = 0;
 
     while(!done) {
@@ -107,22 +113,40 @@ Status RoPromptUserToChooseFromList(const char *title, const char* const* items,
         int northPressed = joystick1 & CONTROLLER_NORTH_BIT;
         int southPressed = joystick1 & CONTROLLER_SOUTH_BIT;
         int firePressed = joystick1 & CONTROLLER_FIRE_BIT;
+        uint8_t keypad1 = RoGetKeypadState(CONTROLLER_1);
+        int fire2Pressed = keypad1 & CONTROLLER_FIRE_BIT;
+
+        // Next two are "Was there a game controller event I care about in this loop?"
         if(northPressed || southPressed || firePressed) {
-            wasPressed = joystick1;
+            joystick1Was = joystick1;
             debounceStart = RoGetMillis();
         }
+        if(fire2Pressed) {
+            keypad1Was = keypad1;
+            debounceStart = RoGetMillis();
+        }
+
+        // This code means "Did an event happen but now the event has ended and the debounce delay elapsed between?"
         uint32_t now = RoGetMillis();
-        if(wasPressed && (joystick1 == 0) && ((now - debounceStart) > 20)) {
-            if(wasPressed & CONTROLLER_NORTH_BIT) {
+        if((keypad1Was | joystick1Was) && ((keypad1 == 0) && (joystick1 == 0)) && ((now - debounceStart) > 20)) {
+            if(joystick1Was & CONTROLLER_NORTH_BIT) {
                 moveUpOne = 1;
             }
-            if(wasPressed & CONTROLLER_SOUTH_BIT) {
+            if(joystick1Was & CONTROLLER_SOUTH_BIT) {
                 moveDownOne = 1;
             }
-            if(wasPressed & CONTROLLER_FIRE_BIT) {
+            if(joystick1Was & CONTROLLER_FIRE_BIT) {
                 selectCurrentLine = 1;
             }
-            wasPressed = 0;
+            if(can_cancel && (keypad1Was & CONTROLLER_FIRE_BIT)) {
+                *itemChosen = -1;
+                status = RO_USER_DECLINED;
+                done = 1;
+                break;
+            }
+
+            joystick1Was = 0;
+            keypad1Was = 0;
         }
 
         RoEvent ev;
