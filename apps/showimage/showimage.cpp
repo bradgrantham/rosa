@@ -264,98 +264,57 @@ struct BMPInfoHeader {
 };
 #pragma pack(pop)
 
-extern "C" {
-
-std::array<std::array<uint8_t, 3>, 256> palette;
-
-int main([[maybe_unused]] int argc, const char **argv)
+int ReadBmpData(FILE *imageFile, std::array<std::array<uint8_t, 3>, 256>& palette, uint8_t *pixels, uint32_t pixelsWidth, uint32_t pixelsRowBytes, uint32_t pixelsHeight)
 {
-    [[maybe_unused]] const char *filename;
-
-    filename = argv[1];
-
-    Set8BitVideoMode();
-
-    MakeHSVPalette(palette);
-    Video8BitConvertPaletteToNTSCColors(palette);
-    ClearScreen(1);
-
-    if(true)
-    {
-        for(int y = 0; y < VIDEO_8_BIT_MODE_HEIGHT; y++)
-        {
-            for(int x = 0; x < VIDEO_8_BIT_MODE_WIDTH_PIXELS; x++)
-            {
-                int c = x * 256 / VIDEO_8_BIT_MODE_WIDTH_PIXELS;
-                SetPixel(x, y, c);
-            }
-        }
-    }
-
-    FILE *fp;
-    fp = fopen (filename, "rb");
-    if(fp == NULL) {
-        printf("ERROR: couldn't open \"%s\" for reading, errno %d\n", filename, errno);
-        return 1;
-    }
+    static uint8_t bmpPalette[256][4]; // BMP palette uses BGRA format
 
     // Read BMP file header
     static BMPFileHeader fileHeader;
-    if(fread(&fileHeader, sizeof(BMPFileHeader), 1, fp) != 1) {
-        printf("ERROR: couldn't read BMP file header from \"%s\"\n", filename);
-        fclose(fp);
+    if(fread(&fileHeader, sizeof(BMPFileHeader), 1, imageFile) != 1) {
+        printf("ERROR: couldn't read BMP file header from file\n");
         return 1;
     }
 
     // Verify BMP signature ('BM')
     if(fileHeader.signature != 0x4D42) { // 'BM' in little endian
-        printf("ERROR: invalid BMP signature in \"%s\"\n", filename);
-        fclose(fp);
+        printf("ERROR: invalid BMP signature in file\n");
         return 1;
     }
-
     // Read BMP info header
     static BMPInfoHeader infoHeader;
-    if(fread(&infoHeader, sizeof(BMPInfoHeader), 1, fp) != 1) {
-        printf("ERROR: couldn't read BMP info header from \"%s\"\n", filename);
-        fclose(fp);
+    if(fread(&infoHeader, sizeof(BMPInfoHeader), 1, imageFile) != 1) {
+        printf("ERROR: couldn't read BMP info header from file\n");
         return 1;
     }
 
     // Validate BMP format
     if(infoHeader.bitsPerPixel != 8) {
-        printf("ERROR: only 8-bit BMP files are supported, \"%s\" is %d-bit\n",
-               filename, infoHeader.bitsPerPixel);
-        fclose(fp);
+        printf("ERROR: only 8-bit BMP files are supported, file is %d-bit\n",
+               infoHeader.bitsPerPixel);
         return 1;
     }
 
     if(infoHeader.compression != 0) {
-        printf("ERROR: compressed BMP files are not supported in \"%s\"\n", filename);
-        fclose(fp);
+        printf("ERROR: compressed BMP files are not supported\n");
         return 1;
     }
 
     if(abs(infoHeader.width) > MAX_FILE_ROW_PIXELS) {
-        printf("ERROR: width %d of image in \"%s\" is too large for static row of %u pixels\n",
-               abs(infoHeader.width), filename, MAX_SCREEN_ROW_PIXELS);
-        fclose(fp);
+        printf("ERROR: width %d of image in file is too large for static row of %u pixels\n",
+               abs(infoHeader.width), MAX_SCREEN_ROW_PIXELS);
         return 1;
     }
 
     // Get the number of colors in the palette
     uint32_t numColors = (infoHeader.colorsUsed == 0) ? 256 : infoHeader.colorsUsed;
     if(numColors > 256) {
-        printf("ERROR: BMP file \"%s\" has more than 256 colors\n", filename);
-        fclose(fp);
+        printf("ERROR: BMP file has more than 256 colors\n");
         return 1;
     }
 
     // Read the color palette (BGRA format in BMP)
-    static uint8_t bmpPalette[256][4]; // BMP palette uses BGRA format
-    if(fread(bmpPalette, 4, numColors, fp) != numColors) {
-        printf("ERROR: couldn't read color palette from \"%s\"\n", filename);
-        fclose(fp);
+    if(fread(bmpPalette, 4, numColors, imageFile) != numColors) {
+        printf("ERROR: couldn't read color palette from file\n");
         return 1;
     }
 
@@ -366,25 +325,19 @@ int main([[maybe_unused]] int argc, const char **argv)
         palette[i][2] = bmpPalette[i][0]; // Blue
     }
 
-    // Apply the NTSC conversion to the palette
-    Video8BitConvertPaletteToNTSCColors(palette);
-
     // Calculate image dimensions
-    int width = abs(infoHeader.width);
-    int height = abs(infoHeader.height);
+    uint32_t width = abs(infoHeader.width);
+    uint32_t height = abs(infoHeader.height);
     bool isBottomUp = infoHeader.height > 0;
 
     // Calculate row padding - BMP rows are padded to 4-byte boundaries
     int rowPadding = (4 - (width % 4)) % 4;
     int rowSize = width + rowPadding;
 
-    printf("%d by %d, isBottomUp %d, %d rowSize, %d offset\n", width, height, isBottomUp, rowSize, fileHeader.dataOffset);
-
     static unsigned char (*rowRGB)[3];
     rowRGB = (unsigned char (*)[3]) malloc(sizeof(rowRGB[0]) * MAX_FILE_ROW_PIXELS);
     if(rowRGB == NULL) {
         printf("failed to allocate row for pixel data\n");
-        fclose(fp);
         return 1;
     }
 
@@ -395,7 +348,6 @@ int main([[maybe_unused]] int argc, const char **argv)
     {
         printf("failed to allocate row for error data\n");
         free(rowRGB);
-        fclose(fp);
         return 1;
     }
     memset(rowError, 0, sizeof(rowError[0]) * 2);
@@ -406,34 +358,32 @@ int main([[maybe_unused]] int argc, const char **argv)
         printf("ERROR: failed to allocate row for pixel data\n");
         free(rowRGB);
         free(rowError);
-        fclose(fp);
         return 1;
     }
 
-    if(fseek(fp, fileHeader.dataOffset, SEEK_SET) != 0)
+    if(fseek(imageFile, fileHeader.dataOffset, SEEK_SET) != 0)
     {
-        printf("ERROR: couldn't seek to image data in \"%s\"\n", filename);
+        printf("ERROR: couldn't seek to image data\n");
         free(rowRGB);
         free(rowError);
         free(rowData);
-        fclose(fp);
         return 1;
     }
 
     int prevImageRowDelta = isBottomUp ? -1 : 1;
     int prevImageRow = isBottomUp ? height : -1;
 
-    for(int y = 0; y < VIDEO_8_BIT_MODE_HEIGHT; y++)
+    for(uint32_t y = 0; y < pixelsHeight; y++)
     {
-        int srcRow = (isBottomUp ? (VIDEO_8_BIT_MODE_HEIGHT - y - 1) : y) * height / VIDEO_8_BIT_MODE_HEIGHT;
+        int srcRow = (isBottomUp ? (pixelsHeight - y - 1) : y) * height / pixelsHeight;
 
         while (prevImageRow != srcRow)
         {
             printf("read row %d\n", prevImageRow);
-            size_t wasRead = fread(rowData, 1, rowSize, fp);
+            size_t wasRead = fread(rowData, 1, rowSize, imageFile);
             if(wasRead != (size_t)rowSize)
             {
-                printf("ERROR: couldn't read row %d from \"%s\", got %zd bytes\n", prevImageRow, filename, wasRead);
+                printf("ERROR: couldn't read row %d, got %zd bytes\n", prevImageRow, wasRead);
                 free(rowError);
                 free(rowRGB);
                 return 1;
@@ -441,7 +391,7 @@ int main([[maybe_unused]] int argc, const char **argv)
             prevImageRow += prevImageRowDelta;
         }
 
-        for(int i = 0; i < width; i++) {
+        for(uint32_t i = 0; i < width; i++) {
             rowRGB[i][0] = palette[rowData[i]][0];
             rowRGB[i][1] = palette[rowData[i]][1];
             rowRGB[i][2] = palette[rowData[i]][2];
@@ -453,8 +403,8 @@ int main([[maybe_unused]] int argc, const char **argv)
         memset(rowError[nextErrorRow], 0, sizeof(rowError[0]));
         short (*errorNextRowFixed8)[3] = rowError[nextErrorRow] + 1;   // So we can access -1 without bounds check
 
-        for(int x = 0; x < VIDEO_8_BIT_MODE_WIDTH_PIXELS; x++) {
-            int srcCol = (x * width + width - 1) / VIDEO_8_BIT_MODE_WIDTH_PIXELS;
+        for(int x = 0; x < static_cast<int>(pixelsWidth); x++) {
+            int srcCol = (x * width + width - 1) / pixelsWidth;
 
             // get the color with error diffused from previous pixels
             int correctedRGB[3];
@@ -465,7 +415,8 @@ int main([[maybe_unused]] int argc, const char **argv)
             // Find the closest color in our palette
             int c = FindClosestColor(palette, correctedRGB[0], correctedRGB[1], correctedRGB[2]);
 
-            SetPixel(x, isBottomUp ? (VIDEO_8_BIT_MODE_HEIGHT - y - 1) : y, c);
+            uint8_t *byte = pixels + (isBottomUp ? (VIDEO_8_BIT_MODE_HEIGHT - y - 1) : y) * pixelsRowBytes + x;
+            *byte = c;
 
             // Calculate our error between what we wanted and what we got
             // and distribute it a la Floyd-Steinberg
@@ -490,9 +441,55 @@ int main([[maybe_unused]] int argc, const char **argv)
         }
     }
 
-    fclose(fp);
     free(rowError);
     free(rowRGB);
+    return 0;
+}
+
+extern "C" {
+
+int main([[maybe_unused]] int argc, const char **argv)
+{
+    [[maybe_unused]] const char *filename;
+
+    static std::array<std::array<uint8_t, 3>, 256> palette;
+
+    filename = argv[1];
+
+    Set8BitVideoMode();
+
+    MakeHSVPalette(palette);
+    Video8BitConvertPaletteToNTSCColors(palette);
+    ClearScreen(1);
+
+    if(true)
+    {
+        for(int y = 0; y < VIDEO_8_BIT_MODE_HEIGHT; y++)
+        {
+            for(int x = 0; x < VIDEO_8_BIT_MODE_WIDTH_PIXELS; x++)
+            {
+                int c = x * 256 / VIDEO_8_BIT_MODE_WIDTH_PIXELS;
+                SetPixel(x, y, c);
+            }
+        }
+    }
+
+    FILE *imageFile;
+    imageFile = fopen (filename, "rb");
+    if(imageFile == NULL) {
+        printf("ERROR: couldn't open \"%s\" for reading, errno %d\n", filename, errno);
+        return 1;
+    }
+
+    int image_result = ReadBmpData(imageFile, palette, Video8BitFramebuffer, VIDEO_8_BIT_MODE_WIDTH_PIXELS, VIDEO_8_BIT_MODE_ROWBYTES, VIDEO_8_BIT_MODE_HEIGHT);
+    fclose(imageFile);
+    if(image_result != 0) {
+        printf("Failed to read image from \"%s\"\n", filename);
+        return 1;
+    }
+
+    // Apply the NTSC conversion to the palette
+    Video8BitConvertPaletteToNTSCColors(palette);
 
     uint32_t prevTick;
     prevTick = RoGetMillis();
