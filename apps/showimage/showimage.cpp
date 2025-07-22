@@ -18,6 +18,7 @@ int showimage_main(int argc, const char **argv);
 
 static int initializer = []() -> int {
     LauncherRegisterApp("Image Viewer", "showimage", "Choose An Image File", "images", ".bmp", {}, {}, showimage_main);
+    LauncherRegisterApp("Slide Show", "showimage", "Choose A Slide Show List", "slideshow", ".txt", {"--slideshow"}, {}, showimage_main);
     return 1;
 }();
 
@@ -450,11 +451,7 @@ extern "C" {
 
 int main([[maybe_unused]] int argc, const char **argv)
 {
-    [[maybe_unused]] const char *filename;
-
     static std::array<std::array<uint8_t, 3>, 256> palette;
-
-    filename = argv[1];
 
     Set8BitVideoMode();
 
@@ -474,61 +471,105 @@ int main([[maybe_unused]] int argc, const char **argv)
         }
     }
 
-    FILE *imageFile;
-    imageFile = fopen (filename, "rb");
-    if(imageFile == NULL) {
-        printf("ERROR: couldn't open \"%s\" for reading, errno %d\n", filename, errno);
-        return 1;
-    }
+    if(strcmp(argv[1], "--slideshow") == 0) {
 
-    int image_result = ReadBmpData(imageFile, palette, Video8BitFramebuffer, VIDEO_8_BIT_MODE_WIDTH_PIXELS, VIDEO_8_BIT_MODE_ROWBYTES, VIDEO_8_BIT_MODE_HEIGHT);
-    fclose(imageFile);
-    if(image_result != 0) {
-        printf("Failed to read image from \"%s\"\n", filename);
-        return 1;
-    }
+        const char *filename = argv[2];
+        FILE *listFile; 
 
-    // Apply the NTSC conversion to the palette
-    Video8BitConvertPaletteToNTSCColors(palette);
-
-    uint32_t prevTick;
-    prevTick = RoGetMillis();
-
-    bool quit = false;
-    do
-    {
-        uint32_t nowTick = RoGetMillis();
-        // Setting this to + 16 made USB keyboard stop working.  
-        if(nowTick >= prevTick + 10) {
-            RoDoHousekeeping();
-            prevTick = nowTick;
+        listFile = fopen (filename, "rb");
+        if(listFile == NULL) {
+            printf("ERROR: couldn't open \"%s\" for reading, errno %d\n", filename, errno);
+            return 1;
         }
-        RoEvent ev;
-        int haveEvent = RoEventPoll(&ev);
+        static char imageFilename[256];
+        while(fgets(imageFilename, sizeof(imageFilename), listFile) != NULL)
+        {
+            imageFilename[strlen(imageFilename) - 1] = '\0';
 
-        if(haveEvent) {
-            switch(ev.eventType) {
-                case RoEvent::KEYBOARD_RAW: {
-                    const struct KeyboardRawEvent raw = ev.u.keyboardRaw;
-                    if(raw.isPress) {
-                        quit = true;
-                    }
-                    break;
-                }
-                case RoEvent::CONSOLE_BUTTONPRESS: {
-                    const ButtonPressEvent& press = ev.u.buttonPress;
-                    if(press.button == 2) {
-                        quit = true;
-                    }
-                }
+            FILE *imageFile;
+            imageFile = fopen (imageFilename, "rb");
+            if(imageFile == NULL) {
+                printf("ERROR: couldn't open \"%s\" for reading, errno %d\n", imageFilename, errno);
+                return 1;
+            }
 
-                default:
-                    // pass;
-                    break;
+            int image_result = ReadBmpData(imageFile, palette, Video8BitFramebuffer, VIDEO_8_BIT_MODE_WIDTH_PIXELS, VIDEO_8_BIT_MODE_ROWBYTES, VIDEO_8_BIT_MODE_HEIGHT);
+            fclose(imageFile);
+            if(image_result != 0) {
+                printf("Failed to read image from \"%s\"\n", imageFilename);
+                return 1;
+            }
+
+            // Apply the NTSC conversion to the palette
+            Video8BitConvertPaletteToNTSCColors(palette);
+
+            for(int i = 0; i < 50; i++) 
+            {
+                RoDoHousekeeping();
+                RoDelayMillis(100);
             }
         }
 
-    } while(!quit);
+    } else {
+
+        const char *filename = argv[1];
+
+        FILE *imageFile;
+        imageFile = fopen (filename, "rb");
+        if(imageFile == NULL) {
+            printf("ERROR: couldn't open \"%s\" for reading, errno %d\n", filename, errno);
+            return 1;
+        }
+
+        int image_result = ReadBmpData(imageFile, palette, Video8BitFramebuffer, VIDEO_8_BIT_MODE_WIDTH_PIXELS, VIDEO_8_BIT_MODE_ROWBYTES, VIDEO_8_BIT_MODE_HEIGHT);
+        fclose(imageFile);
+        if(image_result != 0) {
+            printf("Failed to read image from \"%s\"\n", filename);
+            return 1;
+        }
+
+        // Apply the NTSC conversion to the palette
+        Video8BitConvertPaletteToNTSCColors(palette);
+
+        uint32_t prevTick;
+        prevTick = RoGetMillis();
+
+        bool quit = false;
+        do
+        {
+            uint32_t nowTick = RoGetMillis();
+            // Setting this to + 16 made USB keyboard stop working.  
+            if(nowTick >= prevTick + 10) {
+                RoDoHousekeeping();
+                prevTick = nowTick;
+            }
+            RoEvent ev;
+            int haveEvent = RoEventPoll(&ev);
+
+            if(haveEvent) {
+                switch(ev.eventType) {
+                    case RoEvent::KEYBOARD_RAW: {
+                                                    const struct KeyboardRawEvent raw = ev.u.keyboardRaw;
+                                                    if(raw.isPress) {
+                                                        quit = true;
+                                                    }
+                                                    break;
+                                                }
+                    case RoEvent::CONSOLE_BUTTONPRESS: {
+                                                           const ButtonPressEvent& press = ev.u.buttonPress;
+                                                           if(press.button == 2) {
+                                                               quit = true;
+                                                           }
+                                                       }
+
+                    default:
+                                                       // pass;
+                                                       break;
+                }
+            }
+
+        } while(!quit);
+    }
 
     return 0;
 }
