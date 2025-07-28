@@ -72,7 +72,6 @@ void HSVToRGB3f(float h, float s, float v, float *r, float *g, float *b)
 #define VIDEO_8_BIT_MODE_TOP (480 / 2 - VIDEO_8_BIT_MODE_HEIGHT / 2)
 
 uint8_t *Video8BitFramebuffer;
-
 uint8_t Video8BitColorsToNTSC[256][4];
 
 static uint8_t Video8BitModeBlack;
@@ -113,6 +112,19 @@ void Video8BitConvertPaletteToNTSCColors(const std::array<std::array<uint8_t, 3>
     for(int i = 0; i < 256; i++)
     {
         Video8BitSetPaletteEntry(i, palette[i][0], palette[i][1], palette[i][2]);
+    }
+}
+
+static void Video8BitConvertPaletteToNTSCColorsBuffer(const std::array<std::array<uint8_t, 3>, 256>& palette, uint8_t dest[256][4])
+{
+    for(int i = 0; i < 256; i++)
+    {
+        float y, i_, q;
+        RoRGBToYIQ(palette[i][0] / 255.0f, palette[i][1] / 255.0f, palette[i][2] / 255.0f, &y, &i_, &q);
+        for(int phase = 0; phase < 4; phase++)
+        {
+            dest[i][phase] = RoNTSCYIQToDAC(y, i_, q, phase / 4.0f, Video8BitModeBlack, Video8BitModeWhite);
+        }
     }
 }
 
@@ -453,6 +465,9 @@ int main([[maybe_unused]] int argc, const char **argv)
 {
     static std::array<std::array<uint8_t, 3>, 256> palette;
 
+    uint8_t *Video8BitFramebufferBack = nullptr;
+    uint8_t Video8BitColorsToNTSCBack[256][4];
+
     Set8BitVideoMode();
 
     MakeHSVPalette(palette);
@@ -474,13 +489,22 @@ int main([[maybe_unused]] int argc, const char **argv)
     if(strcmp(argv[1], "--slideshow") == 0) {
 
         const char *filename = argv[2];
-        FILE *listFile; 
+        FILE *listFile;
 
         listFile = fopen (filename, "rb");
         if(listFile == NULL) {
             printf("ERROR: couldn't open \"%s\" for reading, errno %d\n", filename, errno);
             return 1;
         }
+
+        Video8BitFramebufferBack = new(std::nothrow) uint8_t[VIDEO_8_BIT_MODE_ROWBYTES * VIDEO_8_BIT_MODE_HEIGHT];
+        if(Video8BitFramebufferBack == nullptr)
+        {
+            fclose(listFile);
+            printf("ERROR: failed to allocate back framebuffer\n");
+            return 1;
+        }
+
         static char imageFilename[256];
         while(fgets(imageFilename, sizeof(imageFilename), listFile) != NULL)
         {
@@ -493,22 +517,30 @@ int main([[maybe_unused]] int argc, const char **argv)
                 return 1;
             }
 
-            int image_result = ReadBmpData(imageFile, palette, Video8BitFramebuffer, VIDEO_8_BIT_MODE_WIDTH_PIXELS, VIDEO_8_BIT_MODE_ROWBYTES, VIDEO_8_BIT_MODE_HEIGHT);
+            int image_result = ReadBmpData(imageFile, palette, Video8BitFramebufferBack, VIDEO_8_BIT_MODE_WIDTH_PIXELS, VIDEO_8_BIT_MODE_ROWBYTES, VIDEO_8_BIT_MODE_HEIGHT);
             fclose(imageFile);
             if(image_result != 0) {
                 printf("Failed to read image from \"%s\"\n", imageFilename);
                 return 1;
             }
 
-            // Apply the NTSC conversion to the palette
-            Video8BitConvertPaletteToNTSCColors(palette);
+            // Apply the NTSC conversion into the back palette
+            Video8BitConvertPaletteToNTSCColorsBuffer(palette, Video8BitColorsToNTSCBack);
 
-            for(int i = 0; i < 50; i++) 
+            // Wait for vertical blank before swapping to avoid tearing
+            RoVideoWaitNextField();
+            memcpy(Video8BitFramebuffer, Video8BitFramebufferBack, VIDEO_8_BIT_MODE_ROWBYTES * VIDEO_8_BIT_MODE_HEIGHT);
+            memcpy(Video8BitColorsToNTSC, Video8BitColorsToNTSCBack, sizeof(Video8BitColorsToNTSCBack));
+
+            for(int i = 0; i < 50; i++)
             {
                 RoDoHousekeeping();
                 RoDelayMillis(100);
             }
         }
+
+        fclose(listFile);
+        delete[] Video8BitFramebufferBack;
 
     } else {
 
