@@ -3,6 +3,9 @@
 #include <vector>
 #include <array>
 #include <cstring>
+#include <algorithm>
+#include <random>
+#include <ctime>
 #include "rocinante.h"
 #include "events.h"
 #include "ui.h"
@@ -383,6 +386,10 @@ int ReadBmpData(FILE *imageFile, std::array<std::array<uint8_t, 3>, 256>& palett
         return 1;
     }
 
+#if defined(ROSA)
+    uint32_t prevTick = RoGetMillis();
+#endif
+
     int prevImageRowDelta = isBottomUp ? -1 : 1;
     int prevImageRow = isBottomUp ? height : -1;
 
@@ -402,6 +409,16 @@ int ReadBmpData(FILE *imageFile, std::array<std::array<uint8_t, 3>, 256>& palett
                 return 1;
             }
             prevImageRow += prevImageRowDelta;
+
+#if defined(ROSA)
+            uint32_t nowTick = RoGetMillis();
+            if(nowTick >= prevTick + 10) {
+                RoDoHousekeeping();
+                prevTick = nowTick;
+            }
+            RoEvent ev;
+            RoEventPoll(&ev);
+#endif
         }
 
         for(uint32_t i = 0; i < width; i++) {
@@ -452,6 +469,16 @@ int ReadBmpData(FILE *imageFile, std::array<std::array<uint8_t, 3>, 256>& palett
 
             currentErrorRow = nextErrorRow;
         }
+
+#if defined(ROSA)
+        uint32_t nowTickRow = RoGetMillis();
+        if(nowTickRow >= prevTick + 10) {
+            RoDoHousekeeping();
+            prevTick = nowTickRow;
+        }
+        RoEvent evRow;
+        RoEventPoll(&evRow);
+#endif
     }
 
     free(rowError);
@@ -505,41 +532,89 @@ int main([[maybe_unused]] int argc, const char **argv)
             return 1;
         }
 
+        std::vector<std::string> slideNames;
         static char imageFilename[256];
         while(fgets(imageFilename, sizeof(imageFilename), listFile) != NULL)
         {
-            imageFilename[strlen(imageFilename) - 1] = '\0';
+            imageFilename[strcspn(imageFilename, "\r\n")] = '\0';
+            slideNames.emplace_back(imageFilename);
+        }
+        fclose(listFile);
 
-            FILE *imageFile;
-            imageFile = fopen (imageFilename, "rb");
+        if(slideNames.empty())
+        {
+            printf("Slide show list is empty\n");
+            delete[] Video8BitFramebufferBack;
+            return 1;
+        }
+
+        std::vector<size_t> slideOrder(slideNames.size());
+        for(size_t i = 0; i < slideOrder.size(); ++i) {
+            slideOrder[i] = i;
+        }
+
+        std::mt19937 rng(static_cast<unsigned int>(time(nullptr)));
+        size_t whichSlide = 0;
+        bool quit = false;
+        uint32_t prevTick = RoGetMillis();
+
+        while(!quit)
+        {
+            const std::string &slideFile = slideNames[slideOrder[whichSlide]];
+            FILE *imageFile = fopen(slideFile.c_str(), "rb");
             if(imageFile == NULL) {
-                printf("ERROR: couldn't open \"%s\" for reading, errno %d\n", imageFilename, errno);
-                return 1;
+                printf("ERROR: couldn't open \"%s\" for reading, errno %d\n", slideFile.c_str(), errno);
+                break;
             }
 
             int image_result = ReadBmpData(imageFile, palette, Video8BitFramebufferBack, VIDEO_8_BIT_MODE_WIDTH_PIXELS, VIDEO_8_BIT_MODE_ROWBYTES, VIDEO_8_BIT_MODE_HEIGHT);
             fclose(imageFile);
             if(image_result != 0) {
-                printf("Failed to read image from \"%s\"\n", imageFilename);
-                return 1;
+                printf("Failed to read image from \"%s\"\n", slideFile.c_str());
+                break;
             }
 
-            // Apply the NTSC conversion into the back palette
             Video8BitConvertPaletteToNTSCColorsBuffer(palette, Video8BitColorsToNTSCBack);
-
-            // Wait for vertical blank before swapping to avoid tearing
             RoVideoWaitNextField();
             memcpy(Video8BitFramebuffer, Video8BitFramebufferBack, VIDEO_8_BIT_MODE_ROWBYTES * VIDEO_8_BIT_MODE_HEIGHT);
             memcpy(Video8BitColorsToNTSC, Video8BitColorsToNTSCBack, sizeof(Video8BitColorsToNTSCBack));
 
-            for(int i = 0; i < 50; i++)
+            for(int i = 0; i < 50 && !quit; i++)
             {
-                RoDoHousekeeping();
+                uint32_t nowTick = RoGetMillis();
+                if(nowTick >= prevTick + 10) {
+                    RoDoHousekeeping();
+                    prevTick = nowTick;
+                }
+                RoEvent ev;
+                int haveEvent = RoEventPoll(&ev);
+                if(haveEvent) {
+                    switch(ev.eventType) {
+                        case RoEvent::KEYBOARD_RAW: {
+                            const struct KeyboardRawEvent raw = ev.u.keyboardRaw;
+                            if(raw.isPress) {
+                                quit = true;
+                            }
+                            break;
+                        }
+                        case RoEvent::CONSOLE_BUTTONPRESS: {
+                            const ButtonPressEvent& press = ev.u.buttonPress;
+                            if(press.button == 2) {
+                                quit = true;
+                            }
+                            break;
+                        }
+                        default:
+                            break;
+                    }
+                }
                 RoDelayMillis(100);
             }
+
+            std::shuffle(slideOrder.begin(), slideOrder.end(), rng);
+            whichSlide = (whichSlide + 1) % slideOrder.size();
         }
 
-        fclose(listFile);
         delete[] Video8BitFramebufferBack;
 
     } else {
