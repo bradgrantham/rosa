@@ -579,7 +579,8 @@ int main([[maybe_unused]] int argc, const char **argv)
             memcpy(Video8BitFramebuffer, Video8BitFramebufferBack, VIDEO_8_BIT_MODE_ROWBYTES * VIDEO_8_BIT_MODE_HEIGHT);
             memcpy(Video8BitColorsToNTSC, Video8BitColorsToNTSCBack, sizeof(Video8BitColorsToNTSCBack));
 
-            for(int i = 0; i < 50 && !quit; i++)
+            uint32_t slideStart = RoGetMillis();
+            while(!quit && RoGetMillis() - slideStart < 5000)
             {
                 uint32_t nowTick = RoGetMillis();
                 if(nowTick >= prevTick + 10) {
@@ -608,7 +609,6 @@ int main([[maybe_unused]] int argc, const char **argv)
                             break;
                     }
                 }
-                RoDelayMillis(100);
             }
 
             std::shuffle(slideOrder.begin(), slideOrder.end(), rng);
