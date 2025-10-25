@@ -450,21 +450,12 @@ int ReadBmpData(FILE *imageFile, std::array<std::array<uint8_t, 3>, 256>& palett
 
             // Calculate our error between what we wanted and what we got
             // and distribute it a la Floyd-Steinberg
-            int errorFixed8[3];
             for(int i = 0; i < 3; i++) {
-                errorFixed8[i] = 255 * (correctedRGB[i] - palette[c][i]);
-            }
-            for(int i = 0; i < 3; i++) {
-                errorThisRowFixed8[x + 1][i] += errorFixed8[i] * 7 / 16;
-            }
-            for(int i = 0; i < 3; i++) {
-                errorNextRowFixed8[x - 1][i] += errorFixed8[i] * 3 / 16;
-            }
-            for(int i = 0; i < 3; i++) {
-                errorNextRowFixed8[x    ][i] += errorFixed8[i] * 5 / 16;
-            }
-            for(int i = 0; i < 3; i++) {
-                errorNextRowFixed8[x + 1][i] += errorFixed8[i] * 1 / 16;
+                int errorFixed8 = 255 * (correctedRGB[i] - palette[c][i]);
+                errorThisRowFixed8[x + 1][i] += errorFixed8 * 7 / 16;
+                errorNextRowFixed8[x - 1][i] += errorFixed8 * 3 / 16;
+                errorNextRowFixed8[x    ][i] += errorFixed8 * 5 / 16;
+                errorNextRowFixed8[x + 1][i] += errorFixed8 * 1 / 16;
             }
 
             currentErrorRow = nextErrorRow;
