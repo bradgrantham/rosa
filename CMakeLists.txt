@@ -15,7 +15,7 @@ add_compile_definitions(ROSA=1)
 
 find_package(Threads REQUIRED)
 
-set_property(TARGET rosa-emu PROPERTY CXX_STANDARD 17)
+set_property(TARGET rosa-emu PROPERTY CXX_STANDARD 20)
 
 if(MSVC)
     target_compile_options(rosa-emu PRIVATE /W4 /WX)
