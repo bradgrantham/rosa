@@ -378,7 +378,7 @@ int NTSCWaitNextLine(void)
     // moderated by the scanout ISR
     int lineThen = PlatformGetNTSCLineNumber();
     int lineNow;
-    while((lineNow = PlatformGetNTSCLineNumber()) != lineThen);
+    while((lineNow = PlatformGetNTSCLineNumber()) == lineThen);
     if(NTSCModeInterlaced)
     {
         return (lineNow + 1) % 525;
