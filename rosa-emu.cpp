@@ -672,12 +672,11 @@ void scanoutThreadFunc()
     while(continueScanout)
     {
         uint64_t linesSinceStart;
-        std::chrono::time_point<std::chrono::high_resolution_clock> now;
 
         // This is expected to run faster than line rate, but have to handle the case of a thread stall
         do
         {
-            now = std::chrono::high_resolution_clock::now();
+            std::chrono::time_point<std::chrono::high_resolution_clock> now = std::chrono::high_resolution_clock::now();
             auto halfCBsSinceStart = halfCBRate(now - scanoutStarted).count();
             linesSinceStart = static_cast<uint64_t>(halfCBsSinceStart) / halfCBsPerLine;
         }
@@ -687,6 +686,7 @@ void scanoutThreadFunc()
         for(uint64_t i = previousLinesSinceStart + 1; i <= linesSinceStart; i++)
         {
             NTSCFillLineBuffer(videoFrameNumber, videoLineNumber, samples + SAMPLES_X * videoLineNumber);
+
             videoLineNumber ++;
             bool endOfFrame = videoInterlaced ? (videoLineNumber >= 525) : (videoLineNumber >= 262);
             if(endOfFrame)
@@ -929,6 +929,9 @@ int RoDoHousekeeping(void)
     return 0;
 }
 
+
+//----------------------------------------------------------------------------
+
 extern "C" {
     int launcher_main(int argc, const char **argv);
 }
@@ -946,6 +949,7 @@ void usage(const char *progname)
     printf("options:\n");
     printf("\t--root-dir DIR     # use DIR as the root directory for emulation\n");
 }
+
 
 int main(int argc, char **argv)
 {
@@ -988,6 +992,7 @@ int main(int argc, char **argv)
     memset(samples, 128, sizeof(samples));
 
     Start(stereoU8SampleRate, preferredAudioBufferSizeBytes);
+
 
 #if defined(EMSCRIPTEN)
 
