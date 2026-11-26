@@ -182,6 +182,8 @@ Query joystick values using `RoGetJoystickState` using either `CONTROLLER_1` or 
 - `CONTROLLER_SOUTH_BIT`
 - `CONTROLLER_WEST_BIT`
 
+Every platform provides at least `CONTROLLER_1` as a joystick with four directions and fire, and that is the default controller type, `RO_CONTROLLER_ATARI_JOYSTICK`.  An app that needs a ColecoVision controller's keypad and second fire button asks for it with `RoSetControllerType(which, RO_CONTROLLER_COLECOVISION)`, which returns `RO_UNSUPPORTED` if the platform can't provide it.  The launcher sets `CONTROLLER_1` back to the default whenever it has control.
+
 Query keypad values if desired (and when a Colecovision keypad is attached) using `RoGetKeypadState` using either `CONTROLLER_1` or `CONTROLLER_2`.  The result is one of the `CONTROLLER_KEYPAD` values: `0`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `9`, `asterisk`, or `pound`.
 
 ------
@@ -251,7 +253,15 @@ Failure status codes:
 
 `uint8_t RoGetKeypadState(RoControllerIndex which);`
 
-* Read the current keypad button press
+* Read the current keypad button press, or 0 unless the controller type is `RO_CONTROLLER_COLECOVISION`
+
+`Status RoSetControllerType(RoControllerIndex which, RoControllerType type);`
+
+* Choose `RO_CONTROLLER_ATARI_JOYSTICK` (the default) or `RO_CONTROLLER_COLECOVISION`
+
+`RoControllerType RoGetControllerType(RoControllerIndex which);`
+
+* Return the current controller type
 
 ### Video
 

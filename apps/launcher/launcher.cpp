@@ -58,6 +58,9 @@ int launcher_main([[maybe_unused]] int argc, [[maybe_unused]] char **argv)
     }
     
     while(1) {
+        // An app may have changed the controller type; the launcher always uses the default.
+        RoSetControllerType(CONTROLLER_1, RO_CONTROLLER_ATARI_JOYSTICK);
+
         RoTextMode();
         int whichApplication;
         Status result = RoPromptUserToChooseFromList("Choose an application", applications.data(), applications.size(), &whichApplication, 0);

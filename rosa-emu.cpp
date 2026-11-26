@@ -610,6 +610,22 @@ Status RoFillFilenameList(const char* dirName, uint32_t flags, const char* optio
     return status;
 }
 
+static RoControllerType controllerTypes[2] = {RO_CONTROLLER_ATARI_JOYSTICK, RO_CONTROLLER_ATARI_JOYSTICK};
+
+Status RoSetControllerType(RoControllerIndex which, RoControllerType type)
+{
+    if((type != RO_CONTROLLER_ATARI_JOYSTICK) && (type != RO_CONTROLLER_COLECOVISION)) {
+        return RO_INVALID_PARAMETER_VALUE;
+    }
+    controllerTypes[which] = type;
+    return RO_SUCCESS;
+}
+
+RoControllerType RoGetControllerType(RoControllerIndex which)
+{
+    return controllerTypes[which];
+}
+
 uint8_t RoGetJoystickState(RoControllerIndex which)
 {
     (void)which;

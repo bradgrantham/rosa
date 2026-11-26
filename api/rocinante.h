@@ -33,6 +33,7 @@ typedef enum Status {
     RO_RESOURCE_EXHAUSTED = -10,           // There were no more objects of the requested type
     RO_SIZE_EXCEEDED = -11,                // Window could not be created because of memory allocation or possibly other reason
     RO_RESOURCE_NOT_FOUND = -12,           // Root resource e.g. "/" could not be found
+    RO_UNSUPPORTED = -13,                  // The platform cannot provide the requested configuration
 } Status;
 
 #define RO_FAILURE(status) ((status) < 0)
@@ -110,7 +111,22 @@ enum {
 
 typedef enum RoControllerIndex { CONTROLLER_1, CONTROLLER_2 } RoControllerIndex;
 
+// Every platform provides at least CONTROLLER_1 as a joystick with four
+// directions and fire, so that is the default type.  A ColecoVision
+// controller multiplexes a keypad and second fire button onto the same
+// lines and has to be asked for explicitly.
+typedef enum RoControllerType {
+    RO_CONTROLLER_ATARI_JOYSTICK,       // Default; four directions and fire
+    RO_CONTROLLER_COLECOVISION,         // Adds keypad and second fire button
+} RoControllerType;
+
+// Returns RO_UNSUPPORTED if the platform cannot provide that type on that controller.
+Status RoSetControllerType(RoControllerIndex which, RoControllerType type);
+RoControllerType RoGetControllerType(RoControllerIndex which);
+
 uint8_t RoGetJoystickState(RoControllerIndex which);
+
+// Returns 0 unless the controller's type is RO_CONTROLLER_COLECOVISION
 uint8_t RoGetKeypadState(RoControllerIndex which);
 
 //----------------------------------------------------------------------------

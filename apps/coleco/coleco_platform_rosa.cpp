@@ -215,6 +215,12 @@ RoKeyRepeatManager keyRepeat;
 void Start(uint32_t& stereoU8SampleRate_, size_t& preferredAudioBufferSizeBytes_)
 {
     RoKeyRepeatInit(&keyRepeat);
+
+    // ColecoVision games expect the keypad and second fire button.  A platform
+    // that can't provide them leaves the controllers as plain joysticks.
+    RoSetControllerType(RoControllerIndex::CONTROLLER_1, RO_CONTROLLER_COLECOVISION);
+    RoSetControllerType(RoControllerIndex::CONTROLLER_2, RO_CONTROLLER_COLECOVISION);
+
     RoVideoSetMode(0, RO_VIDEO_ROW_SAMPLES_1368, nullptr, Pixmap256_192_4b_ModeInit, Pixmap256_192_4b_ModeFini, Pixmap256_192_4b_ModeFillRowBuffer, Pixmap256_192_4b_ModeNeedsColorburst);
 
     RoAudioGetSamplingInfo(&audioSampleRate, &audioChunkLengthBytes);
