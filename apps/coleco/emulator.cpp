@@ -168,7 +168,14 @@ struct SN76489A
     uint32_t tone_bit[3] = {0, 0, 0};
     uint32_t noise_counter{0};
 
-    uint16_t noise_register = 0x8000;
+    // The ColecoVision's discrete SN76489 has a 15-bit shift register: white
+    // noise taps bits 0 and 1 and feeds bit 14, and periodic noise repeats
+    // every 15 shifts.  (The 16-bit register with taps 0 and 3 is the Sega
+    // Master System / Genesis integrated PSG.)
+    static constexpr int NOISE_REGISTER_TOP_BIT = 14;
+    static constexpr uint16_t NOISE_REGISTER_SEED = 1 << NOISE_REGISTER_TOP_BIT;
+
+    uint16_t noise_register = NOISE_REGISTER_SEED;
     uint32_t noise_flipflop = 0;
 
     clk_t previous_clock{0};
@@ -191,7 +198,7 @@ struct SN76489A
 
         std::fill(tone_bit, tone_bit + 3, 0);
 
-        noise_register = 0x8000;
+        noise_register = NOISE_REGISTER_SEED;
         noise_flipflop = 0;
     }
 
@@ -227,16 +234,21 @@ struct SN76489A
             } else if(reg == 6) {
                 noise_config = (data & CMD_NOISE_CONFIG_MASK) >> CMD_NOISE_CONFIG_SHIFT;
                 noise_length_id = data & CMD_NOISE_FREQ_MASK;
+                // The noise counter reloads 0x10, 0x20 or 0x40 and counts at
+                // clock/16 like a tone counter, so its output flips every
+                // 256, 512 or 1024 machine clocks.  The shift register is
+                // clocked on only one edge of that output (noise_flipflop),
+                // giving the datasheet's shift rates of N/512, N/1024, N/2048.
                 if(noise_length_id == 0) {
-                    noise_length = 512;
+                    noise_length = 16 * 0x10;
                 } else if(noise_length_id == 1) {
-                    noise_length = 1024;
+                    noise_length = 16 * 0x20;
                 } else if(noise_length_id == 2) {
-                    noise_length = 2048;
+                    noise_length = 16 * 0x40;
                 }
                 /* if noise_length_id == 3 then noise counter is tone_counters[2]*/
 
-                noise_register = 0x8000;
+                noise_register = NOISE_REGISTER_SEED;
             }
 
         } else {
@@ -268,9 +280,9 @@ struct SN76489A
                 noise_flipflop ^= 1;
 
                 if(noise_flipflop) {
-                    uint8_t new_bit = (noise_register & 0x1) ^ ((noise_register & 0x8) >> 3);
+                    uint8_t new_bit = (noise_register & 0x1) ^ ((noise_register & 0x2) >> 1);
 
-                    noise_register = (noise_register >> 1) | (new_bit << 15);
+                    noise_register = (noise_register >> 1) | (new_bit << NOISE_REGISTER_TOP_BIT);
                 }
             }
         } else {
@@ -278,7 +290,7 @@ struct SN76489A
                 noise_flipflop ^= 1;
 
                 if(noise_flipflop) {
-                    noise_register = (noise_register >> 1) | ((noise_register & 0x1) << 15);
+                    noise_register = (noise_register >> 1) | ((noise_register & 0x1) << NOISE_REGISTER_TOP_BIT);
                 }
             }
         }
